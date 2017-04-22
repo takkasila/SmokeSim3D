@@ -10,8 +10,8 @@ uniform float u_screen_height;
 
 varying vec2 f_uv;
 
-#define SCENEBB_POS vec3(0.0, -0.5, 0.0)
-#define SCENEBB_SIZE vec3(5.0, 0.5, 5.0)
+#define SCENEBB_POS vec3(0.0, -1.0, 0.0)
+#define SCENEBB_SIZE vec3(5.0, 0.8, 5.0)
 #define SMOKEBB_POS vec3(0.5)
 #define SMOKEBB_SIZE vec3(0.5)
 
@@ -20,6 +20,12 @@ struct Ray {
     vec3 dir;
     float depth;
 };
+
+float checkerboardTexture(vec3 p)
+{
+    p = floor(mod(p, 2.0));
+    return mod(p.x+p.y+p.z, 2.0);
+}
 
 vec3 absorb(vec3 originColor, float amount)
 {
@@ -88,7 +94,7 @@ vec3 renderScene(Ray ray)
     vec2 tt;
     if(intersectRayCube(ray.start, ray.dir, SCENEBB_POS, SCENEBB_SIZE, tt) > 0.0)
     {
-        return vec3(250.0/255.0, 208.0/255.0, 192.0/255.0);
+        return vec3(checkerboardTexture(ray.start + ray.dir * tt.x));
     }
     else
     {
