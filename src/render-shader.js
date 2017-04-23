@@ -26,7 +26,7 @@ export default class RenderShader{
                 },
                 u_cam_lookAt: {
                     type: '3fv',
-                    value: new THREE.Vector3(0,0,0)
+                    value: new THREE.Vector3(32,0,32)
                 },
                 u_cam_vfov: {
                     type: 'f',

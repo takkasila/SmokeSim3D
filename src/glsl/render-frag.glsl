@@ -10,11 +10,12 @@ uniform float u_screen_height;
 
 varying vec2 f_uv;
 
-#define SCENEBB_POS vec3(0.0, -1.0, 0.0)
-#define SCENEBB_SIZE vec3(5.0, 1.0, 5.0)
-#define SMOKEBB_START vec3(-5.0, 0.0, -5.0)
-#define SMOKEBB_STOP vec3(5.0, 10.0, 5.0)
-#define CELL_COUNT ivec3(10)
+#define EPSILON 0.0001
+#define SCENEBB_POS vec3(32.0, -1.0, 32.0)
+#define SCENEBB_SIZE vec3(32.0, 1.0, 32.0)
+#define SMOKEBB_START vec3(0.0)
+#define SMOKEBB_STOP vec3(64.0, 128.0, 64.0)
+#define CELL_COUNT ivec3(64, 128, 64)
 
 struct Ray {
     vec3 start;
@@ -30,17 +31,17 @@ float checkerboardTexture(vec3 p)
 
 float smokeDense(vec3 p)
 {
-    if(abs(p.x) < 2.0 && abs(p.z) <2.0)
+    if(abs(p.x-32.0) < 2.0 && abs(p.z-32.0) <2.0)
         return 1.0;
-    else if(p.y >7.0)
+    else if(p.y >100.0)
         return 1.0;
     else
-        return 0.1;
+        return 0.00001;
 }
 
 vec3 absorb(vec3 originColor, float amount)
 {
-    float fogAmount = 1.0 - exp(-amount * 3.0);
+    float fogAmount = 1.0 - exp(-amount * 0.5);
     vec3 fogColor = vec3(1.0, 0.0, 0.0);
     return mix(originColor, fogColor, fogAmount);
 }
@@ -138,14 +139,27 @@ float densityTrace(Ray ray)
     if(intersectRayCubeNorm(ray.start, ray.dir, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP - SMOKEBB_START)/2.0, tt, n0, n1) > 0.0)
     {
         // Enter cube to reduce surface error
-        vec3 startPos = ray.start + ray.dir * tt.x - n0 * 0.01;
+        vec3 startPos, endPos;
+        if(tt.x < tt.y)
+        {
+            startPos = ray.start + ray.dir * tt.x - n0 * EPSILON;
+            endPos = ray.start + ray.dir * tt.y + n1 * EPSILON;
+        }
+        else
+        {
+            startPos = ray.start;
+            endPos = ray.start + ray.dir * tt.x + n0 * EPSILON;
+        }
+        // endPos -= startPos;
         x = int(floor(startPos.x));
         y = int(floor(startPos.y));
         z = int(floor(startPos.z));
-        vec3 endPos = ray.start + ray.dir * tt.y + n1 * 0.01;
         dx = int(floor(endPos.x));
         dy = int(floor(endPos.y));
         dz = int(floor(endPos.z));
+        dx-=x;
+        dy-=y;
+        dz-=z;
     }
     else
         return 0.0;
@@ -160,14 +174,24 @@ float densityTrace(Ray ray)
     bx = 2*ax;	   by = 2*ay;	  bz = 2*az;
     exy = ay-ax;   exz = az-ax;	  ezy = ay-az;
 
+    vec3 cellPos;
     for(int n = 0; n < CELL_COUNT.x + CELL_COUNT.y + CELL_COUNT.z; n++)
     {
-        if(n >= ax+ay+az)
+        if(n >= ax+ay+az+1)
             break;
 
-        vec3 cellPos = SMOKEBB_START + vec3(x,y,z)*cellSize + cellSize/2.0;
-        if(intersectRayCube(ray.start, ray.dir, cellPos, cellSize/2.0, tt) > 0.0)
-            totalDense += smokeDense(cellPos);
+        cellPos = SMOKEBB_START + vec3(x,y,z)*cellSize + cellSize/2.0;
+        intersectRayCubeNorm(ray.start, ray.dir, cellPos, cellSize/2.0, tt, n0, n1);
+        if(tt.x < tt.y)
+        {
+            cellPos = ray.start + ray.dir * tt.x - n0 * EPSILON;
+            totalDense += smokeDense(cellPos) * (tt.y-tt.x);
+        }
+        else
+        {
+            cellPos = ray.start + ray.dir * tt.x + n0 * EPSILON;
+            totalDense += smokeDense(cellPos) * length(cellPos - ray.start);
+        }
         
         // Update
         if ( exy < 0 ) {
@@ -191,9 +215,7 @@ float densityTrace(Ray ray)
             }
         }
     }
-    // return totalDense;
-    return float(ax+ay+az)/float(CELL_COUNT.x + CELL_COUNT.y + CELL_COUNT.z);
-    // return 1.0;
+    return totalDense;
 }
 
 vec3 renderScene(Ray ray)
@@ -202,7 +224,14 @@ vec3 renderScene(Ray ray)
     vec3 n0, n1;
     if(intersectRayCubeNorm(ray.start, ray.dir, SCENEBB_POS, SCENEBB_SIZE, tt, n0, n1) > 0.0)
     {
-        return vec3(checkerboardTexture(ray.start + ray.dir * tt.x - n0 * 0.01));
+        if(tt.x < tt.y)
+        {
+            return vec3(checkerboardTexture(ray.start + ray.dir * tt.x - n0 * EPSILON));
+        }
+        else
+        {
+            return vec3(checkerboardTexture(ray.start + ray.dir * tt.x + n0 * EPSILON));
+        }
     }
     else
     {

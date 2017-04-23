@@ -35,8 +35,8 @@ window.addEventListener('load', function() {
     scene.add(new THREE.AxisHelper(20));
     scene.add(new THREE.DirectionalLight(0xffffff, 1));
 
-    camera.position.set(-5, 5, 5);
-    camera.lookAt(new THREE.Vector3(0,0,0));
+    camera.position.set(128, 128, 128);
+    camera.lookAt(new THREE.Vector3(32,0,32));
     
     controls.target.set(0,0,0);
     var renderShader = new RenderShader(renderer, scene, camera, window.innerWidth, window.innerHeight);
