@@ -13,6 +13,9 @@ uniform int u_cell_x;
 uniform int u_cell_y;
 uniform int u_cell_z;
 
+uniform vec3 topColor;
+uniform vec3 btmColor;
+
 varying vec2 f_uv;
 
 #define EPSILON 0.0001
@@ -21,6 +24,7 @@ varying vec2 f_uv;
 #define SMOKEBB_START vec3(0.0)
 #define SMOKEBB_STOP vec3(float(u_cell_x), float(u_cell_y), float(u_cell_z))
 #define MAXCELL ivec3(256)
+#define SKYBOX_RADIUS 10000
 
 struct Ray {
     vec3 start;
@@ -116,6 +120,33 @@ float intersectRayCubeNorm(vec3 rp, vec3 rd, vec3 cp, vec3 cth, out vec2 t, out 
     }
 	
 	return t.y < t.x ? 0.0 : (t.x > 0.0 ? 1.0 : -1.0);
+}
+
+bool intersectSphere(vec3 rp, vec3 rd, vec3 cp, float radius, out float outT)
+{
+    vec3 centerToPoint = rp - cp;
+	float a = dot(rd, rd);
+	float b = 2.0 * dot(rd, centerToPoint);
+	float c = dot(centerToPoint, centerToPoint) - (radius*radius);
+
+	// Solve quadratic equation
+	float det = b*b - 4.0 * a*c;
+	if (det < 0.0)
+		return false;
+
+	float root1 = (-b + sqrt(det)) / (2.0 * a);
+	float root2 = (-b - sqrt(det)) / (2.0 * a);
+
+	// Check result
+	if (root1 > 0.0 && root2 > 0.0)
+		outT = min(root1, root2);
+	else
+		outT = max(root1, root2);
+
+	if (outT < 0.0)
+		return false;
+
+	return true;
 }
 
 vec3 rayDirection()
@@ -246,7 +277,14 @@ vec3 renderScene(Ray ray)
 
 vec3 renderSkyBox(Ray ray)
 {
-    return vec3(0.75);
+    // return vec3(0.75);
+    float outT;
+    if(intersectSphere(ray.start, ray.dir, vec3(0.0), 10000.0, outT))
+    {
+        float tempY = (ray.start.y + ray.dir.y * outT)/10000.0;
+        tempY = (tempY+1.0)/2.0;
+        return mix(btmColor, topColor, tempY);
+    }
 }
 
 vec3 render(Ray ray)

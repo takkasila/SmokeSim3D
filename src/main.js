@@ -103,6 +103,14 @@ window.addEventListener('load', function() {
             u_cell_z:{
                 type: 'i',
                 value: cellCount[2]
+            },
+            topColor:{
+                type: 'v3',
+                value: null
+            },
+            btmColor:{
+                type: 'v3',
+                value: null
             }
         },
         vertexShader: require('./glsl/pass-vert.glsl'),
@@ -127,11 +135,23 @@ window.addEventListener('load', function() {
         reset: function(){
             fluid.reset(); 
             dataTex.needsUpdate = true;
-        }
+        },
+        topColor: new THREE.Vector3(0.9686274, 0.737254902, 0.4313725),
+        btmColor: new THREE.Vector3(1, 0.6941176, 0.6078431),
+        topColorGUI: [0.9686274 * 255, 0.737254902 * 255, 0.4313725 * 255],
+        btmColorGUI: [1 * 255, 0.6941176 * 255, 0.6078431 * 255]
     };
     gui.add(param, 'simulating', true);
     gui.add(param, 'reset');
-
+    gui.addColor(param, 'topColorGUI').name('North Pole').onChange(function(newVal){
+        myPlaneMaterial.uniforms.topColor.value = new THREE.Vector3(param.topColorGUI[0]/255, param.topColorGUI[1]/255, param.topColorGUI[2]/255);
+    });
+    gui.addColor(param, 'btmColorGUI').name('South Pole').onChange(function(newVal){
+        myPlaneMaterial.uniforms.btmColor.value = new THREE.Vector3(param.btmColorGUI[0]/255, param.btmColorGUI[1]/255, param.btmColorGUI[2]/255);
+    })
+    myPlaneMaterial.uniforms.topColor.value = new THREE.Vector3(param.topColorGUI[0]/255, param.topColorGUI[1]/255, param.topColorGUI[2]/255);
+    myPlaneMaterial.uniforms.btmColor.value = new THREE.Vector3(param.btmColorGUI[0]/255, param.btmColorGUI[1]/255, param.btmColorGUI[2]/255);
+    
     (function tick() {
         controls.update();
         stats.begin();
