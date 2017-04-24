@@ -7,6 +7,8 @@ import DAT from 'dat-gui'
 import Stats from 'stats-js'
 import FluidSolver from './fluid_solver'
 
+var cellCount = [64, 64, 64]
+
 window.addEventListener('load', function() {
     var stats = new Stats();
     stats.setMode(1);
@@ -30,13 +32,12 @@ window.addEventListener('load', function() {
     controls.zoomSpeed = 1.0;
     controls.panSpeed = 2.0;
     
-    camera.position.set(70, 70, 70);
-    var lookAt = new Float32Array([32, 0, 32])
-    camera.lookAt(new THREE.Vector3(lookAt[0],lookAt[1],lookAt[2]));
+    camera.position.set(cellCount[0]+5, cellCount[1]+5, cellCount[2]+5);
+    camera.lookAt(new THREE.Vector3(cellCount[0]/2, cellCount[1]/2, cellCount[2]/2));
     
-    controls.target.set(lookAt[0],lookAt[1],lookAt[2]);
+    controls.target.set(cellCount[0]/2, cellCount[1]/2, cellCount[2]/2);
 
-    var fluid = new FluidSolver(64, 64, 64, 0);
+    var fluid = new FluidSolver(cellCount[0], cellCount[1], cellCount[2], 0);
     fluid.add_flow(0.47, 0.53, 0.0, 0.05, 0.47, 0.53, 0.8, 0, 1, 0)
     fluid.add_flow(0.47, 0.53, 0.47, 0.53, 0.0, 0.05, 0.8, 0, 0, 1)
     fluid.update(0.05)
@@ -65,7 +66,7 @@ window.addEventListener('load', function() {
             },
             u_cam_lookAt: {
                 type: '3fv',
-                value: new THREE.Vector3(lookAt[0],lookAt[1],lookAt[2])
+                value: new THREE.Vector3(cellCount[0]/2, cellCount[1]/2, cellCount[2]/2)
             },
             u_cam_vfov: {
                 type: 'f',
@@ -90,6 +91,18 @@ window.addEventListener('load', function() {
             u_texture:{
                 type: 't',
                 value: dataTex
+            },
+            u_cell_x:{
+                type: 'i',
+                value: cellCount[0]
+            },
+            u_cell_y:{
+                type: 'i',
+                value: cellCount[1]
+            },
+            u_cell_z:{
+                type: 'i',
+                value: cellCount[2]
             }
         },
         vertexShader: require('./glsl/pass-vert.glsl'),

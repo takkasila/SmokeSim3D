@@ -9,14 +9,18 @@ uniform sampler2D u_texture;
 uniform float u_screen_width;
 uniform float u_screen_height;
 
+uniform int u_cell_x;
+uniform int u_cell_y;
+uniform int u_cell_z;
+
 varying vec2 f_uv;
 
 #define EPSILON 0.0001
-#define SCENEBB_POS vec3(32.0, -1.0, 32.0)
-#define SCENEBB_SIZE vec3(32.0, 1.0, 32.0)
+#define SCENEBB_POS vec3(float(u_cell_x)/2.0, -1.0, float(u_cell_z)/2.0)
+#define SCENEBB_SIZE vec3(float(u_cell_x)/2.0, 1.0, float(u_cell_z)/2.0)
 #define SMOKEBB_START vec3(0.0)
-#define SMOKEBB_STOP vec3(64.0)
-#define CELL_COUNT ivec3(64)
+#define SMOKEBB_STOP vec3(float(u_cell_x), float(u_cell_y), float(u_cell_z))
+#define MAXCELL ivec3(256)
 
 struct Ray {
     vec3 start;
@@ -33,8 +37,8 @@ float checkerboardTexture(vec3 p)
 // Input cell index
 float smokeDense(ivec3 p)
 {
-    vec2 tmp = vec2(float(p.x)/float(CELL_COUNT.x)
-                    , float(p.z)/float(CELL_COUNT.z * CELL_COUNT.y) + (float(p.y))/float(CELL_COUNT.y));
+    vec2 tmp = vec2(float(p.x)/float(u_cell_x)
+                    , float(p.z)/float(u_cell_z * u_cell_y) + (float(p.y))/float(u_cell_y));
     return texture2D(u_texture, tmp).r;
 }
 
@@ -131,7 +135,7 @@ vec3 rayDirection()
 float densityTrace(Ray ray)
 {
     float totalDense = 0.0;
-    vec3 cellSize = (SMOKEBB_STOP - SMOKEBB_START) / float(CELL_COUNT);
+    vec3 cellSize = (SMOKEBB_STOP - SMOKEBB_START) / float(ivec3(u_cell_x, u_cell_y, u_cell_z));
     vec2 tt;
     vec3 n0, n1;
     int x, y, z, dx, dy, dz;
@@ -174,24 +178,24 @@ float densityTrace(Ray ray)
     exy = ay-ax;   exz = az-ax;	  ezy = ay-az;
 
     vec3 cellPos;
-    for(int n = 0; n < CELL_COUNT.x + CELL_COUNT.y + CELL_COUNT.z; n++)
+    for(int n = 0; n < MAXCELL.x + MAXCELL.y + MAXCELL.z; n++)
     {
         if(n >= ax+ay+az+1)
             break;
 
-        cellPos = vec3(x,y,z)*cellSize + cellSize/2.0;
+        // cellPos = vec3(x,y,z)*cellSize + cellSize/2.0;
         intersectRayCubeNorm(ray.start, ray.dir, cellPos, cellSize/2.0, tt, n0, n1);
         if(tt.x < tt.y)
         {
             // cellPos = ray.start + ray.dir * tt.x - n0 * EPSILON;
             // totalDense += smokeDense(cellPos) * (tt.y-tt.x);
-            totalDense += smokeDense(ivec3(x,y,z));
+            totalDense += smokeDense(ivec3(x,y,z)) * (tt.y-tt.x);
         }
         else
         {
-            // cellPos = ray.start + ray.dir * tt.x + n0 * EPSILON;
+            cellPos = ray.start + ray.dir * tt.x + n0 * EPSILON;
             // totalDense += smokeDense(cellPos) * length(cellPos - ray.start);
-            totalDense += smokeDense(ivec3(x,y,z));
+            totalDense += smokeDense(ivec3(x,y,z)) * length(cellPos - ray.start);
         }
         
         // Update
