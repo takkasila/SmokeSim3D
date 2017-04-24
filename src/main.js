@@ -32,10 +32,10 @@ window.addEventListener('load', function() {
     controls.zoomSpeed = 1.0;
     controls.panSpeed = 2.0;
     
-    camera.position.set(cellCount[0]+5, cellCount[1]+5, cellCount[2]+5);
-    camera.lookAt(new THREE.Vector3(cellCount[0]/2, cellCount[1]/2, cellCount[2]/2));
+    camera.position.set(cellCount[0]+3, cellCount[1]+3, cellCount[2]+3);
+    camera.lookAt(new THREE.Vector3(cellCount[0]/2, 0, cellCount[2]/2));
     
-    controls.target.set(cellCount[0]/2, cellCount[1]/2, cellCount[2]/2);
+    controls.target.set(cellCount[0]/2, 0, cellCount[2]/2);
 
     var fluid = new FluidSolver(cellCount[0], cellCount[1], cellCount[2], 0);
     fluid.add_flow(0.47, 0.53, 0.0, 0.05, 0.47, 0.53, 0.8, 0, 1, 0)
@@ -66,7 +66,7 @@ window.addEventListener('load', function() {
             },
             u_cam_lookAt: {
                 type: '3fv',
-                value: new THREE.Vector3(cellCount[0]/2, cellCount[1]/2, cellCount[2]/2)
+                value: new THREE.Vector3(cellCount[0]/2, 0, cellCount[2]/2)
             },
             u_cam_vfov: {
                 type: 'f',

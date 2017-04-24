@@ -24,7 +24,9 @@ varying vec2 f_uv;
 #define SMOKEBB_START vec3(0.0)
 #define SMOKEBB_STOP vec3(float(u_cell_x), float(u_cell_y), float(u_cell_z))
 #define MAXCELL ivec3(256)
-#define SKYBOX_RADIUS 10000
+#define SKYBOX_RADIUS 10000.0
+
+#define SUN_DIR  normalize(vec3(float(-u_cell_x), float(-u_cell_y*2), float(-u_cell_z)))
 
 struct Ray {
     vec3 start;
@@ -258,30 +260,39 @@ vec3 renderScene(Ray ray)
 {
     vec2 tt;
     vec3 n0, n1;
-    if(intersectRayCubeNorm(ray.start, ray.dir, SCENEBB_POS, SCENEBB_SIZE, tt, n0, n1) > 0.0)
+    vec3 color = vec3(0.0);
+
+    intersectRayCubeNorm(ray.start, ray.dir, SCENEBB_POS, SCENEBB_SIZE, tt, n0, n1);
+    if(tt.x < tt.y)
     {
-        if(tt.x < tt.y)
+        //Outside plane 
+        vec3 tmpPos = ray.start + ray.dir * tt.x - n0 * EPSILON;
+        color = vec3(checkerboardTexture(tmpPos));
+        
+        if(intersectRayCube(tmpPos, -SUN_DIR, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP-SMOKEBB_START)/2.0, tt) > 0.0)
         {
-            return vec3(checkerboardTexture(ray.start + ray.dir * tt.x - n0 * EPSILON));
-        }
-        else
-        {
-            return vec3(checkerboardTexture(ray.start + ray.dir * tt.x + n0 * EPSILON));
+            //Hit smokebox, will need to trace smoke for density
+            Ray shadowRay;
+            shadowRay.start = tmpPos;
+            shadowRay.dir = -SUN_DIR;
+            color *= 1.0 - densityTrace(shadowRay);
         }
     }
     else
     {
-        return vec3(0.75);
+        //Inside plane
+        color = vec3(checkerboardTexture(ray.start + ray.dir * tt.x + n0 * EPSILON));
     }
+    return color;
 }
 
 vec3 renderSkyBox(Ray ray)
 {
     // return vec3(0.75);
     float outT;
-    if(intersectSphere(ray.start, ray.dir, vec3(0.0), 10000.0, outT))
+    if(intersectSphere(ray.start, ray.dir, vec3(0.0), SKYBOX_RADIUS, outT))
     {
-        float tempY = (ray.start.y + ray.dir.y * outT)/10000.0;
+        float tempY = (ray.start.y + ray.dir.y * outT)/SKYBOX_RADIUS;
         tempY = (tempY+1.0)/2.0;
         return mix(btmColor, topColor, tempY);
     }
