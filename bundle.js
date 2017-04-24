@@ -54,16 +54,12 @@
 	
 	var _statsJs2 = _interopRequireDefault(_statsJs);
 	
-	var _renderShader = __webpack_require__(5);
-	
-	var _renderShader2 = _interopRequireDefault(_renderShader);
-	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
-	__webpack_require__(15);
+	__webpack_require__(5);
 	
 	var THREE = __webpack_require__(6);
-	var OrbitControls = __webpack_require__(16)(THREE);
+	var OrbitControls = __webpack_require__(7)(THREE);
 	
 	window.addEventListener('load', function () {
 	    var stats = new _statsJs2.default();
@@ -90,27 +86,91 @@
 	
 	    var gui = new _datGui2.default.GUI();
 	
-	    scene.add(new THREE.AxisHelper(20));
-	    scene.add(new THREE.DirectionalLight(0xffffff, 1));
-	
-	    camera.position.set(128, 128, 128);
-	    camera.lookAt(new THREE.Vector3(32, 0, 32));
+	    camera.position.set(32, 32, 32);
+	    var lookAt = new Float32Array([16, 0, 16]);
+	    camera.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
 	
 	    controls.target.set(0, 0, 0);
-	    var renderShader = new _renderShader2.default(renderer, scene, camera, window.innerWidth, window.innerHeight);
+	
+	    //Dummy Data
+	    var side = 32;
+	    var amount = Math.pow(side, 2);
+	    var data = new Uint8Array(amount);
+	    for (var i = 0; i < amount; i++) {
+	        data[i] = Math.random() * 256;
+	    }
+	    var dataTex = new THREE.DataTexture(data, side, side, THREE.LuminanceFormat, THREE.UnsignedByteType);
+	    dataTex.magFilter = THREE.NearestFilter;
+	    dataTex.needsUpdate = true;
+	    //=======================================
+	    var myPlaneMaterial = new THREE.ShaderMaterial({
+	        uniforms: {
+	            u_buffer: {
+	                type: '4fv',
+	                value: undefined
+	            },
+	            u_count: {
+	                type: 'i',
+	                value: 0
+	            },
+	            u_cam_pos: {
+	                type: '3fv',
+	                value: camera.position
+	            },
+	            u_cam_up: {
+	                type: '3fv',
+	                value: new THREE.Vector3(0, 1, 0)
+	            },
+	            u_cam_lookAt: {
+	                type: '3fv',
+	                value: new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2])
+	            },
+	            u_cam_vfov: {
+	                type: 'f',
+	                value: camera.fov
+	            },
+	            u_cam_near: {
+	                type: 'f',
+	                value: camera.near
+	            },
+	            u_cam_far: {
+	                type: 'f',
+	                value: camera.far
+	            },
+	            u_screen_width: {
+	                type: 'f',
+	                value: window.innerWidth
+	            },
+	            u_screen_height: {
+	                type: 'f',
+	                value: window.innerHeight
+	            },
+	            u_texture: {
+	                type: 't',
+	                value: dataTex
+	            }
+	        },
+	        vertexShader: __webpack_require__(8),
+	        fragmentShader: __webpack_require__(9)
+	    });
+	    var myPlaneGeo = new THREE.PlaneBufferGeometry(2, 2);
+	    var myPlane = new THREE.Mesh(myPlaneGeo, myPlaneMaterial);
+	    myPlane.position.set(0, 0, 5);
+	    scene.add(myPlane);
 	
 	    window.addEventListener('resize', function () {
 	        camera.aspect = window.innerWidth / window.innerHeight;
 	        camera.updateProjectionMatrix();
 	        renderer.setSize(window.innerWidth, window.innerHeight);
-	        renderShader.setSize(window.innerWidth, window.innerHeight);
+	        myPlaneMaterial.uniforms.u_screen_width.value = window.innerWidth;
+	        myPlaneMaterial.uniforms.u_screen_height.value = window.innerHeight;
 	    });
 	
 	    (function tick() {
 	        controls.update();
 	        stats.begin();
-	        renderShader.update(camera);
-	        renderShader.render();
+	        myPlaneMaterial.uniforms.u_cam_pos.value = camera.position;
+	        renderer.render(scene, camera);
 	        stats.end();
 	        requestAnimationFrame(tick);
 	    })();
@@ -4564,99 +4624,7 @@
 /* 5 */
 /***/ function(module, exports, __webpack_require__) {
 
-	'use strict';
-	
-	Object.defineProperty(exports, "__esModule", {
-	    value: true
-	});
-	
-	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-	
-	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-	
-	var THREE = __webpack_require__(6);
-	var EffectComposer = __webpack_require__(7)(THREE);
-	
-	// change to class
-	
-	var RenderShader = function () {
-	    function RenderShader(renderer, scene, camera, width, height) {
-	        _classCallCheck(this, RenderShader);
-	
-	        this.composer = new EffectComposer(renderer);
-	        this.shaderPass = new EffectComposer.ShaderPass({
-	            uniforms: {
-	                u_buffer: {
-	                    type: '4fv',
-	                    value: undefined
-	                },
-	                u_count: {
-	                    type: 'i',
-	                    value: 0
-	                },
-	                u_cam_pos: {
-	                    type: '3fv',
-	                    value: camera.position
-	                },
-	                u_cam_up: {
-	                    type: '3fv',
-	                    value: new THREE.Vector3(0, 1, 0)
-	                },
-	                u_cam_lookAt: {
-	                    type: '3fv',
-	                    value: new THREE.Vector3(32, 0, 32)
-	                },
-	                u_cam_vfov: {
-	                    type: 'f',
-	                    value: camera.fov
-	                },
-	                u_cam_near: {
-	                    type: 'f',
-	                    value: camera.near
-	                },
-	                u_cam_far: {
-	                    type: 'f',
-	                    value: camera.far
-	                },
-	                u_screen_width: {
-	                    type: 'f',
-	                    value: width
-	                },
-	                u_screen_height: {
-	                    type: 'f',
-	                    value: height
-	                }
-	            },
-	            vertexShader: __webpack_require__(13),
-	            fragmentShader: __webpack_require__(14)
-	        });
-	        this.shaderPass.renderToScreen = true;
-	        this.composer.addPass(this.shaderPass);
-	    }
-	
-	    _createClass(RenderShader, [{
-	        key: 'render',
-	        value: function render() {
-	            this.composer.render();
-	        }
-	    }, {
-	        key: 'setSize',
-	        value: function setSize(width, height) {
-	            this.shaderPass.material.uniforms.u_screen_width.value = width;
-	            this.shaderPass.material.uniforms.u_screen_height.value = height;
-	        }
-	    }, {
-	        key: 'update',
-	        value: function update(camera) {
-	            this.shaderPass.material.uniforms.u_cam_pos.value = camera.position;
-	        }
-	    }]);
-	
-	    return RenderShader;
-	}();
-	
-	exports.default = RenderShader;
-	;
+	module.exports = __webpack_require__.p + "index.html";
 
 /***/ },
 /* 6 */
@@ -47966,443 +47934,6 @@
 
 /***/ },
 /* 7 */
-/***/ function(module, exports, __webpack_require__) {
-
-	/**
-	 * @author alteredq / http://alteredqualia.com/
-	 */
-	
-	module.exports = function(THREE) {
-	  var CopyShader = EffectComposer.CopyShader = __webpack_require__(8)
-	    , RenderPass = EffectComposer.RenderPass = __webpack_require__(9)(THREE)
-	    , ShaderPass = EffectComposer.ShaderPass = __webpack_require__(10)(THREE, EffectComposer)
-	    , MaskPass = EffectComposer.MaskPass = __webpack_require__(11)(THREE)
-	    , ClearMaskPass = EffectComposer.ClearMaskPass = __webpack_require__(12)(THREE)
-	
-	  function EffectComposer( renderer, renderTarget ) {
-	    this.renderer = renderer;
-	
-	    if ( renderTarget === undefined ) {
-	      var width = window.innerWidth || 1;
-	      var height = window.innerHeight || 1;
-	      var parameters = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat, stencilBuffer: false };
-	
-	      renderTarget = new THREE.WebGLRenderTarget( width, height, parameters );
-	    }
-	
-	    this.renderTarget1 = renderTarget;
-	    this.renderTarget2 = renderTarget.clone();
-	
-	    this.writeBuffer = this.renderTarget1;
-	    this.readBuffer = this.renderTarget2;
-	
-	    this.passes = [];
-	
-	    this.copyPass = new ShaderPass( CopyShader );
-	  };
-	
-	  EffectComposer.prototype = {
-	    swapBuffers: function() {
-	
-	      var tmp = this.readBuffer;
-	      this.readBuffer = this.writeBuffer;
-	      this.writeBuffer = tmp;
-	
-	    },
-	
-	    addPass: function ( pass ) {
-	
-	      this.passes.push( pass );
-	
-	    },
-	
-	    insertPass: function ( pass, index ) {
-	
-	      this.passes.splice( index, 0, pass );
-	
-	    },
-	
-	    render: function ( delta ) {
-	
-	      this.writeBuffer = this.renderTarget1;
-	      this.readBuffer = this.renderTarget2;
-	
-	      var maskActive = false;
-	
-	      var pass, i, il = this.passes.length;
-	
-	      for ( i = 0; i < il; i ++ ) {
-	
-	        pass = this.passes[ i ];
-	
-	        if ( !pass.enabled ) continue;
-	
-	        pass.render( this.renderer, this.writeBuffer, this.readBuffer, delta, maskActive );
-	
-	        if ( pass.needsSwap ) {
-	
-	          if ( maskActive ) {
-	
-	            var context = this.renderer.context;
-	
-	            context.stencilFunc( context.NOTEQUAL, 1, 0xffffffff );
-	
-	            this.copyPass.render( this.renderer, this.writeBuffer, this.readBuffer, delta );
-	
-	            context.stencilFunc( context.EQUAL, 1, 0xffffffff );
-	
-	          }
-	
-	          this.swapBuffers();
-	
-	        }
-	
-	        if ( pass instanceof MaskPass ) {
-	
-	          maskActive = true;
-	
-	        } else if ( pass instanceof ClearMaskPass ) {
-	
-	          maskActive = false;
-	
-	        }
-	
-	      }
-	
-	    },
-	
-	    reset: function ( renderTarget ) {
-	
-	      if ( renderTarget === undefined ) {
-	
-	        renderTarget = this.renderTarget1.clone();
-	
-	        renderTarget.width = window.innerWidth;
-	        renderTarget.height = window.innerHeight;
-	
-	      }
-	
-	      this.renderTarget1 = renderTarget;
-	      this.renderTarget2 = renderTarget.clone();
-	
-	      this.writeBuffer = this.renderTarget1;
-	      this.readBuffer = this.renderTarget2;
-	
-	    },
-	
-	    setSize: function ( width, height ) {
-	
-	      var renderTarget = this.renderTarget1.clone();
-	
-	      renderTarget.width = width;
-	      renderTarget.height = height;
-	
-	      this.reset( renderTarget );
-	
-	    }
-	
-	  };
-	
-	  // shared ortho camera
-	
-	  EffectComposer.camera = new THREE.OrthographicCamera( -1, 1, 1, -1, 0, 1 );
-	
-	  EffectComposer.quad = new THREE.Mesh( new THREE.PlaneGeometry( 2, 2 ), null );
-	
-	  EffectComposer.scene = new THREE.Scene();
-	  EffectComposer.scene.add( EffectComposer.quad );
-	
-	  return EffectComposer
-	};
-
-/***/ },
-/* 8 */
-/***/ function(module, exports) {
-
-	/**
-	 * @author alteredq / http://alteredqualia.com/
-	 *
-	 * Full-screen textured quad shader
-	 */
-	
-	module.exports = {
-	  uniforms: {
-	    "tDiffuse": { type: "t", value: null },
-	    "opacity":  { type: "f", value: 1.0 }
-	  },
-	  vertexShader: [
-	    "varying vec2 vUv;",
-	
-	    "void main() {",
-	
-	      "vUv = uv;",
-	      "gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );",
-	
-	    "}"
-	  ].join("\n"),
-	  fragmentShader: [
-	    "uniform float opacity;",
-	
-	    "uniform sampler2D tDiffuse;",
-	
-	    "varying vec2 vUv;",
-	
-	    "void main() {",
-	
-	      "vec4 texel = texture2D( tDiffuse, vUv );",
-	      "gl_FragColor = opacity * texel;",
-	
-	    "}"
-	  ].join("\n")
-	};
-
-
-/***/ },
-/* 9 */
-/***/ function(module, exports) {
-
-	/**
-	 * @author alteredq / http://alteredqualia.com/
-	 */
-	
-	module.exports = function(THREE) {
-	  function RenderPass( scene, camera, overrideMaterial, clearColor, clearAlpha ) {
-	    if (!(this instanceof RenderPass)) return new RenderPass(scene, camera, overrideMaterial, clearColor, clearAlpha);
-	
-	    this.scene = scene;
-	    this.camera = camera;
-	
-	    this.overrideMaterial = overrideMaterial;
-	
-	    this.clearColor = clearColor;
-	    this.clearAlpha = ( clearAlpha !== undefined ) ? clearAlpha : 1;
-	
-	    this.oldClearColor = new THREE.Color();
-	    this.oldClearAlpha = 1;
-	
-	    this.enabled = true;
-	    this.clear = true;
-	    this.needsSwap = false;
-	
-	  };
-	
-	  RenderPass.prototype = {
-	
-	    render: function ( renderer, writeBuffer, readBuffer, delta ) {
-	
-	      this.scene.overrideMaterial = this.overrideMaterial;
-	
-	      if ( this.clearColor ) {
-	
-	        this.oldClearColor.copy( renderer.getClearColor() );
-	        this.oldClearAlpha = renderer.getClearAlpha();
-	
-	        renderer.setClearColor( this.clearColor, this.clearAlpha );
-	
-	      }
-	
-	      renderer.render( this.scene, this.camera, readBuffer, this.clear );
-	
-	      if ( this.clearColor ) {
-	
-	        renderer.setClearColor( this.oldClearColor, this.oldClearAlpha );
-	
-	      }
-	
-	      this.scene.overrideMaterial = null;
-	
-	    }
-	
-	  };
-	
-	  return RenderPass;
-	
-	};
-
-
-/***/ },
-/* 10 */
-/***/ function(module, exports) {
-
-	/**
-	 * @author alteredq / http://alteredqualia.com/
-	 */
-	
-	module.exports = function(THREE, EffectComposer) {
-	  function ShaderPass( shader, textureID ) {
-	    if (!(this instanceof ShaderPass)) return new ShaderPass(shader, textureID);
-	
-	    this.textureID = ( textureID !== undefined ) ? textureID : "tDiffuse";
-	
-	    this.uniforms = THREE.UniformsUtils.clone( shader.uniforms );
-	
-	    this.material = new THREE.ShaderMaterial( {
-	
-	      uniforms: this.uniforms,
-	      vertexShader: shader.vertexShader,
-	      fragmentShader: shader.fragmentShader
-	
-	    } );
-	
-	    this.renderToScreen = false;
-	
-	    this.enabled = true;
-	    this.needsSwap = true;
-	    this.clear = false;
-	
-	  };
-	
-	  ShaderPass.prototype = {
-	
-	    render: function ( renderer, writeBuffer, readBuffer, delta ) {
-	
-	      if ( this.uniforms[ this.textureID ] ) {
-	
-	        this.uniforms[ this.textureID ].value = readBuffer;
-	
-	      }
-	
-	      EffectComposer.quad.material = this.material;
-	
-	      if ( this.renderToScreen ) {
-	
-	        renderer.render( EffectComposer.scene, EffectComposer.camera );
-	
-	      } else {
-	
-	        renderer.render( EffectComposer.scene, EffectComposer.camera, writeBuffer, this.clear );
-	
-	      }
-	
-	    }
-	
-	  };
-	
-	  return ShaderPass;
-	
-	};
-
-/***/ },
-/* 11 */
-/***/ function(module, exports) {
-
-	/**
-	 * @author alteredq / http://alteredqualia.com/
-	 */
-	
-	module.exports = function(THREE) {
-	  function MaskPass( scene, camera ) {
-	    if (!(this instanceof MaskPass)) return new MaskPass(scene, camera);
-	
-	    this.scene = scene;
-	    this.camera = camera;
-	
-	    this.enabled = true;
-	    this.clear = true;
-	    this.needsSwap = false;
-	
-	    this.inverse = false;
-	  };
-	
-	  MaskPass.prototype = {
-	
-	    render: function ( renderer, writeBuffer, readBuffer, delta ) {
-	
-	      var context = renderer.context;
-	
-	      // don't update color or depth
-	
-	      context.colorMask( false, false, false, false );
-	      context.depthMask( false );
-	
-	      // set up stencil
-	
-	      var writeValue, clearValue;
-	
-	      if ( this.inverse ) {
-	
-	        writeValue = 0;
-	        clearValue = 1;
-	
-	      } else {
-	
-	        writeValue = 1;
-	        clearValue = 0;
-	
-	      }
-	
-	      context.enable( context.STENCIL_TEST );
-	      context.stencilOp( context.REPLACE, context.REPLACE, context.REPLACE );
-	      context.stencilFunc( context.ALWAYS, writeValue, 0xffffffff );
-	      context.clearStencil( clearValue );
-	
-	      // draw into the stencil buffer
-	
-	      renderer.render( this.scene, this.camera, readBuffer, this.clear );
-	      renderer.render( this.scene, this.camera, writeBuffer, this.clear );
-	
-	      // re-enable update of color and depth
-	
-	      context.colorMask( true, true, true, true );
-	      context.depthMask( true );
-	
-	      // only render where stencil is set to 1
-	
-	      context.stencilFunc( context.EQUAL, 1, 0xffffffff );  // draw if == 1
-	      context.stencilOp( context.KEEP, context.KEEP, context.KEEP );
-	
-	    }
-	
-	  };
-	
-	  return MaskPass
-	};
-
-
-/***/ },
-/* 12 */
-/***/ function(module, exports) {
-
-	/**
-	 * @author alteredq / http://alteredqualia.com/
-	 */
-	
-	module.exports = function(THREE) {
-	  function ClearMaskPass() {
-	    if (!(this instanceof ClearMaskPass)) return new ClearMaskPass(scene, camera);
-	    this.enabled = true;
-	  };
-	
-	  ClearMaskPass.prototype = {
-	    render: function ( renderer, writeBuffer, readBuffer, delta ) {
-	      var context = renderer.context;
-	      context.disable( context.STENCIL_TEST );
-	    }
-	  };
-	
-	  return ClearMaskPass
-	};
-
-/***/ },
-/* 13 */
-/***/ function(module, exports) {
-
-	module.exports = "varying vec2 f_uv;\r\nvoid main() {\r\n    f_uv = uv;\r\n    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\r\n}"
-
-/***/ },
-/* 14 */
-/***/ function(module, exports) {
-
-	module.exports = "uniform vec3 u_cam_pos;\r\nuniform vec3 u_cam_up;\r\nuniform vec3 u_cam_lookAt;\r\nuniform float u_cam_vfov;\r\nuniform float u_cam_near;\r\nuniform float u_cam_far;\r\n\r\nuniform float u_screen_width;\r\nuniform float u_screen_height;\r\n\r\nvarying vec2 f_uv;\r\n\r\n#define EPSILON 0.0001\r\n#define SCENEBB_POS vec3(32.0, -1.0, 32.0)\r\n#define SCENEBB_SIZE vec3(32.0, 1.0, 32.0)\r\n#define SMOKEBB_START vec3(0.0)\r\n#define SMOKEBB_STOP vec3(64.0, 128.0, 64.0)\r\n#define CELL_COUNT ivec3(64, 128, 64)\r\n\r\nstruct Ray {\r\n    vec3 start;\r\n    vec3 dir;\r\n    float depth;\r\n};\r\n\r\nfloat checkerboardTexture(vec3 p)\r\n{\r\n    p = floor(mod(p, 2.0));\r\n    return mod(p.x+p.y+p.z, 2.0);\r\n}\r\n\r\nfloat smokeDense(vec3 p)\r\n{\r\n    if(abs(p.x-32.0) < 2.0 && abs(p.z-32.0) <2.0)\r\n        return 1.0;\r\n    else if(p.y >100.0)\r\n        return 1.0;\r\n    else\r\n        return 0.00001;\r\n}\r\n\r\nvec3 absorb(vec3 originColor, float amount)\r\n{\r\n    float fogAmount = 1.0 - exp(-amount * 0.5);\r\n    vec3 fogColor = vec3(1.0, 0.0, 0.0);\r\n    return mix(originColor, fogColor, fogAmount);\r\n}\r\n\r\nvec3 If(bvec3 cond, vec3 resT, vec3 resF)\r\n{\r\n    vec3 res;\r\n    res.x = cond.x ? resT.x : resF.x;\r\n    res.y = cond.y ? resT.y : resF.y;\r\n    res.z = cond.z ? resT.z : resF.z;    \r\n\r\n    return res;\r\n}\r\n\r\nfloat intersectRayCube(vec3 rp, vec3 rd, vec3 cp, vec3 cth, out vec2 t)\r\n{\t\r\n\trp -= cp;\r\n\t\r\n\tvec3 m = 1.0 / -rd;\r\n\tvec3 o = If(lessThan(rd, vec3(0.0)), -cth, cth);\r\n\t\r\n\tvec3 uf = (rp + o) * m;\r\n\tvec3 ub = (rp - o) * m;\r\n\t\r\n\tt.x = max(uf.x, max(uf.y, uf.z));\r\n\tt.y = min(ub.x, min(ub.y, ub.z));\r\n\t\r\n\t// if(ray start == inside cube) \r\n\tif(t.x < 0.0 && t.y > 0.0) {t.xy = t.yx;  return 1.0;}\r\n\t\r\n\treturn t.y < t.x ? 0.0 : (t.x > 0.0 ? 1.0 : -1.0);\r\n}\r\n\r\nfloat intersectRayCubeNorm(vec3 rp, vec3 rd, vec3 cp, vec3 cth, out vec2 t, out vec3 n0, out vec3 n1)\r\n{\t\r\n\trp -= cp;\r\n\t\r\n\tvec3 m = 1.0 / -rd;\r\n    vec3 os = If(lessThan(rd, vec3(0.0)), vec3(1.0), vec3(-1.0));\r\n    //vec3 os = sign(-rd);\r\n\tvec3 o = -cth * os;\r\n\t\r\n    \r\n\tvec3 uf = (rp + o) * m;\r\n\tvec3 ub = (rp - o) * m;\r\n\t\r\n\t//t.x = max(uf.x, max(uf.y, uf.z));\r\n\t//t.y = min(ub.x, min(ub.y, ub.z));\r\n\t\r\n    if(uf.x > uf.y) {t.x = uf.x; n0 = vec3(os.x, 0.0, 0.0);} else \r\n                    {t.x = uf.y; n0 = vec3(0.0, os.y, 0.0);}\r\n    if(uf.z > t.x ) {t.x = uf.z; n0 = vec3(0.0, 0.0, os.z);}\r\n    \r\n    if(ub.x < ub.y) {t.y = ub.x; n1 = vec3(os.x, 0.0, 0.0);} else \r\n                    {t.y = ub.y; n1 = vec3(0.0, os.y, 0.0);}\r\n    if(ub.z < t.y ) {t.y = ub.z; n1 = vec3(0.0, 0.0, os.z);}\r\n    \r\n    \r\n\t// if(ray start == inside cube) \r\n\tif(t.x < 0.0 && t.y > 0.0) \r\n    {\r\n        t.xy = t.yx;  \r\n        \r\n        vec3 n00 = n0;\r\n        n0 = n1;\r\n        n1 = n00;\r\n        \r\n        return 1.0;\r\n    }\r\n\t\r\n\treturn t.y < t.x ? 0.0 : (t.x > 0.0 ? 1.0 : -1.0);\r\n}\r\n\r\nvec3 rayDirection()\r\n{\r\n    // Creat camera plane\r\n    vec2 uv = f_uv * 2.0 - 1.0;\r\n    vec3 view_n = normalize(u_cam_pos - u_cam_lookAt);\r\n    vec3 view_u = normalize(cross(u_cam_up, view_n));\r\n    vec3 view_v = normalize(cross(view_n, view_u));\r\n\r\n    vec3 plane_top = view_v * u_cam_near * tan(radians(u_cam_vfov)/2.0);\r\n    vec3 plane_right = view_u * (u_screen_width/u_screen_height) * length(plane_top);\r\n    return normalize(-view_n * u_cam_near + plane_right * uv.x + plane_top * uv.y);\r\n}\r\n\r\n// Volxel traversal along 3D line\r\nfloat densityTrace(Ray ray)\r\n{\r\n    float totalDense = 0.0;\r\n    vec3 cellSize = (SMOKEBB_STOP - SMOKEBB_START) / float(CELL_COUNT);\r\n    vec2 tt;\r\n    vec3 n0, n1;\r\n    int x, y, z, dx, dy, dz;\r\n    if(intersectRayCubeNorm(ray.start, ray.dir, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP - SMOKEBB_START)/2.0, tt, n0, n1) > 0.0)\r\n    {\r\n        // Enter cube to reduce surface error\r\n        vec3 startPos, endPos;\r\n        if(tt.x < tt.y)\r\n        {\r\n            startPos = ray.start + ray.dir * tt.x - n0 * EPSILON;\r\n            endPos = ray.start + ray.dir * tt.y + n1 * EPSILON;\r\n        }\r\n        else\r\n        {\r\n            startPos = ray.start;\r\n            endPos = ray.start + ray.dir * tt.x + n0 * EPSILON;\r\n        }\r\n        // endPos -= startPos;\r\n        x = int(floor(startPos.x));\r\n        y = int(floor(startPos.y));\r\n        z = int(floor(startPos.z));\r\n        dx = int(floor(endPos.x));\r\n        dy = int(floor(endPos.y));\r\n        dz = int(floor(endPos.z));\r\n        dx-=x;\r\n        dy-=y;\r\n        dz-=z;\r\n    }\r\n    else\r\n        return 0.0;\r\n        \r\n    int sx, sy, sz, exy, exz, ezy, ax, ay, az, bx, by, bz;\r\n    sx = int(sign(float(dx)));\r\n    sy = int(sign(float(dy)));\r\n    sz = int(sign(float(dz)));\r\n    ax = int(abs(float(dx)));\r\n    ay = int(abs(float(dy)));\r\n    az = int(abs(float(dz)));\r\n    bx = 2*ax;\t   by = 2*ay;\t  bz = 2*az;\r\n    exy = ay-ax;   exz = az-ax;\t  ezy = ay-az;\r\n\r\n    vec3 cellPos;\r\n    for(int n = 0; n < CELL_COUNT.x + CELL_COUNT.y + CELL_COUNT.z; n++)\r\n    {\r\n        if(n >= ax+ay+az+1)\r\n            break;\r\n\r\n        cellPos = SMOKEBB_START + vec3(x,y,z)*cellSize + cellSize/2.0;\r\n        intersectRayCubeNorm(ray.start, ray.dir, cellPos, cellSize/2.0, tt, n0, n1);\r\n        if(tt.x < tt.y)\r\n        {\r\n            cellPos = ray.start + ray.dir * tt.x - n0 * EPSILON;\r\n            totalDense += smokeDense(cellPos) * (tt.y-tt.x);\r\n        }\r\n        else\r\n        {\r\n            cellPos = ray.start + ray.dir * tt.x + n0 * EPSILON;\r\n            totalDense += smokeDense(cellPos) * length(cellPos - ray.start);\r\n        }\r\n        \r\n        // Update\r\n        if ( exy < 0 ) {\r\n            if ( exz < 0 ) {\r\n            x += sx;\r\n            exy += by; exz += bz;\r\n            }\r\n            else  {\r\n            z += sz;\r\n            exz -= bx; ezy += by;\r\n            }\r\n        }\r\n        else {\r\n            if ( ezy < 0 ) {\r\n            z += sz;\r\n            exz -= bx; ezy += by;\r\n            }\r\n            else  {\r\n            y += sy;\r\n            exy -= bx; ezy -= bz;\r\n            }\r\n        }\r\n    }\r\n    return totalDense;\r\n}\r\n\r\nvec3 renderScene(Ray ray)\r\n{\r\n    vec2 tt;\r\n    vec3 n0, n1;\r\n    if(intersectRayCubeNorm(ray.start, ray.dir, SCENEBB_POS, SCENEBB_SIZE, tt, n0, n1) > 0.0)\r\n    {\r\n        if(tt.x < tt.y)\r\n        {\r\n            return vec3(checkerboardTexture(ray.start + ray.dir * tt.x - n0 * EPSILON));\r\n        }\r\n        else\r\n        {\r\n            return vec3(checkerboardTexture(ray.start + ray.dir * tt.x + n0 * EPSILON));\r\n        }\r\n    }\r\n    else\r\n    {\r\n        return vec3(0.75);\r\n    }\r\n}\r\n\r\nvec3 renderSkyBox(Ray ray)\r\n{\r\n    return vec3(0.75);\r\n}\r\n\r\nvec3 render(Ray ray)\r\n{\r\n    vec2 sceneDist;\r\n    vec2 smokeDist;\r\n\r\n    if (intersectRayCube(ray.start, ray.dir, SCENEBB_POS, SCENEBB_SIZE, sceneDist) > 0.0)\r\n    {\r\n        vec3 sceneColor = renderScene(ray);\r\n        if(intersectRayCube(ray.start, ray.dir, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP-SMOKEBB_START)/2.0, smokeDist) > 0.0)\r\n        {\r\n            // Hit both\r\n            if(sceneDist.x <= smokeDist.x)\r\n            {\r\n                return sceneColor;\r\n            }\r\n            else\r\n            {\r\n                float totalDense = densityTrace(ray);\r\n                return absorb(sceneColor, totalDense);\r\n            }\r\n        }\r\n        else\r\n        {\r\n            // Hit only scene\r\n            return sceneColor;\r\n        }\r\n    }\r\n    else\r\n    {\r\n        vec3 skyboxColor = renderSkyBox(ray);\r\n        if(intersectRayCube(ray.start, ray.dir, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP-SMOKEBB_START)/2.0, smokeDist) > 0.0)\r\n        {\r\n            // Hit smoke\r\n            float totalDense = densityTrace(ray);\r\n            return absorb(skyboxColor, totalDense);\r\n        }\r\n        else\r\n        {\r\n            // Hit only skybox\r\n            return skyboxColor;\r\n        }\r\n    }\r\n}\r\n\r\nvoid main() {\r\n    Ray ray;\r\n    ray.start = u_cam_pos;\r\n    ray.dir = rayDirection();\r\n    ray.depth = 0.0;\r\n\r\n    gl_FragColor = vec4(render(ray), 1.0);\r\n}"
-
-/***/ },
-/* 15 */
-/***/ function(module, exports, __webpack_require__) {
-
-	module.exports = __webpack_require__.p + "index.html";
-
-/***/ },
-/* 16 */
 /***/ function(module, exports) {
 
 	module.exports = function( THREE ) {
@@ -49426,6 +48957,18 @@
 		return OrbitControls;
 	};
 
+
+/***/ },
+/* 8 */
+/***/ function(module, exports) {
+
+	module.exports = "varying vec2 f_uv;\r\nvoid main() {\r\n    f_uv = uv;\r\n    // gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\r\n    gl_Position = vec4(position, 1.0);\r\n}"
+
+/***/ },
+/* 9 */
+/***/ function(module, exports) {
+
+	module.exports = "uniform vec3 u_cam_pos;\r\nuniform vec3 u_cam_up;\r\nuniform vec3 u_cam_lookAt;\r\nuniform float u_cam_vfov;\r\nuniform float u_cam_near;\r\nuniform float u_cam_far;\r\n\r\nuniform sampler2D u_texture;\r\nuniform float u_screen_width;\r\nuniform float u_screen_height;\r\n\r\nvarying vec2 f_uv;\r\n\r\n#define EPSILON 0.0001\r\n#define SCENEBB_POS vec3(16.0, -1.0, 16.0)\r\n#define SCENEBB_SIZE vec3(32.0, 1.0, 32.0)\r\n#define SMOKEBB_START vec3(0.0)\r\n#define SMOKEBB_STOP vec3(32.0, 1.0, 32.0)\r\n#define CELL_COUNT ivec3(32, 1, 32)\r\n\r\nstruct Ray {\r\n    vec3 start;\r\n    vec3 dir;\r\n    float depth;\r\n};\r\n\r\nfloat checkerboardTexture(vec3 p)\r\n{\r\n    p = floor(mod(p, 2.0));\r\n    // return mod(p.x+p.y+p.z, 2.0);\r\n    return 0.9;\r\n}\r\n\r\nivec2 AT(ivec3 p)\r\n{\r\n    return ivec2(p.x+p.z*CELL_COUNT.x+p.y*CELL_COUNT.x*CELL_COUNT.z, 1);\r\n}\r\n\r\nfloat smokeDense(vec3 p)\r\n{\r\n    vec2 tmp = vec2(p.x/32.0,p.z/32.0);\r\n    return texture2D(u_texture, tmp).r;\r\n}\r\n\r\nvec3 absorb(vec3 originColor, float amount)\r\n{\r\n    float fogAmount = 1.0 - exp(-amount * 0.5);\r\n    vec3 fogColor = vec3(1.0, 0.0, 0.0);\r\n    return mix(originColor, fogColor, fogAmount);\r\n}\r\n\r\nvec3 If(bvec3 cond, vec3 resT, vec3 resF)\r\n{\r\n    vec3 res;\r\n    res.x = cond.x ? resT.x : resF.x;\r\n    res.y = cond.y ? resT.y : resF.y;\r\n    res.z = cond.z ? resT.z : resF.z;    \r\n\r\n    return res;\r\n}\r\n\r\nfloat intersectRayCube(vec3 rp, vec3 rd, vec3 cp, vec3 cth, out vec2 t)\r\n{\t\r\n\trp -= cp;\r\n\t\r\n\tvec3 m = 1.0 / -rd;\r\n\tvec3 o = If(lessThan(rd, vec3(0.0)), -cth, cth);\r\n\t\r\n\tvec3 uf = (rp + o) * m;\r\n\tvec3 ub = (rp - o) * m;\r\n\t\r\n\tt.x = max(uf.x, max(uf.y, uf.z));\r\n\tt.y = min(ub.x, min(ub.y, ub.z));\r\n\t\r\n\t// if(ray start == inside cube) \r\n\tif(t.x < 0.0 && t.y > 0.0) {t.xy = t.yx;  return 1.0;}\r\n\t\r\n\treturn t.y < t.x ? 0.0 : (t.x > 0.0 ? 1.0 : -1.0);\r\n}\r\n\r\nfloat intersectRayCubeNorm(vec3 rp, vec3 rd, vec3 cp, vec3 cth, out vec2 t, out vec3 n0, out vec3 n1)\r\n{\t\r\n\trp -= cp;\r\n\t\r\n\tvec3 m = 1.0 / -rd;\r\n    vec3 os = If(lessThan(rd, vec3(0.0)), vec3(1.0), vec3(-1.0));\r\n    //vec3 os = sign(-rd);\r\n\tvec3 o = -cth * os;\r\n\t\r\n    \r\n\tvec3 uf = (rp + o) * m;\r\n\tvec3 ub = (rp - o) * m;\r\n\t\r\n\t//t.x = max(uf.x, max(uf.y, uf.z));\r\n\t//t.y = min(ub.x, min(ub.y, ub.z));\r\n\t\r\n    if(uf.x > uf.y) {t.x = uf.x; n0 = vec3(os.x, 0.0, 0.0);} else \r\n                    {t.x = uf.y; n0 = vec3(0.0, os.y, 0.0);}\r\n    if(uf.z > t.x ) {t.x = uf.z; n0 = vec3(0.0, 0.0, os.z);}\r\n    \r\n    if(ub.x < ub.y) {t.y = ub.x; n1 = vec3(os.x, 0.0, 0.0);} else \r\n                    {t.y = ub.y; n1 = vec3(0.0, os.y, 0.0);}\r\n    if(ub.z < t.y ) {t.y = ub.z; n1 = vec3(0.0, 0.0, os.z);}\r\n    \r\n    \r\n\t// if(ray start == inside cube) \r\n\tif(t.x < 0.0 && t.y > 0.0) \r\n    {\r\n        t.xy = t.yx;  \r\n        \r\n        vec3 n00 = n0;\r\n        n0 = n1;\r\n        n1 = n00;\r\n        \r\n        return 1.0;\r\n    }\r\n\t\r\n\treturn t.y < t.x ? 0.0 : (t.x > 0.0 ? 1.0 : -1.0);\r\n}\r\n\r\nvec3 rayDirection()\r\n{\r\n    // Creat camera plane\r\n    vec2 uv = f_uv * 2.0 - 1.0;\r\n    vec3 view_n = normalize(u_cam_pos - u_cam_lookAt);\r\n    vec3 view_u = normalize(cross(u_cam_up, view_n));\r\n    vec3 view_v = normalize(cross(view_n, view_u));\r\n\r\n    vec3 plane_top = view_v * u_cam_near * tan(radians(u_cam_vfov)/2.0);\r\n    vec3 plane_right = view_u * (u_screen_width/u_screen_height) * length(plane_top);\r\n    return normalize(-view_n * u_cam_near + plane_right * uv.x + plane_top * uv.y);\r\n}\r\n\r\n// Volxel traversal along 3D line\r\nfloat densityTrace(Ray ray)\r\n{\r\n    float totalDense = 0.0;\r\n    vec3 cellSize = (SMOKEBB_STOP - SMOKEBB_START) / float(CELL_COUNT);\r\n    vec2 tt;\r\n    vec3 n0, n1;\r\n    int x, y, z, dx, dy, dz;\r\n    if(intersectRayCubeNorm(ray.start, ray.dir, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP - SMOKEBB_START)/2.0, tt, n0, n1) > 0.0)\r\n    {\r\n        // Enter cube to reduce surface error\r\n        vec3 startPos, endPos;\r\n        if(tt.x < tt.y)\r\n        {\r\n            startPos = ray.start + ray.dir * tt.x - n0 * EPSILON;\r\n            endPos = ray.start + ray.dir * tt.y + n1 * EPSILON;\r\n        }\r\n        else\r\n        {\r\n            startPos = ray.start;\r\n            endPos = ray.start + ray.dir * tt.x + n0 * EPSILON;\r\n        }\r\n        // endPos -= startPos;\r\n        x = int(floor(startPos.x));\r\n        y = int(floor(startPos.y));\r\n        z = int(floor(startPos.z));\r\n        dx = int(floor(endPos.x));\r\n        dy = int(floor(endPos.y));\r\n        dz = int(floor(endPos.z));\r\n        dx-=x;\r\n        dy-=y;\r\n        dz-=z;\r\n    }\r\n    else\r\n        return 0.0;\r\n        \r\n    int sx, sy, sz, exy, exz, ezy, ax, ay, az, bx, by, bz;\r\n    sx = int(sign(float(dx)));\r\n    sy = int(sign(float(dy)));\r\n    sz = int(sign(float(dz)));\r\n    ax = int(abs(float(dx)));\r\n    ay = int(abs(float(dy)));\r\n    az = int(abs(float(dz)));\r\n    bx = 2*ax;\t   by = 2*ay;\t  bz = 2*az;\r\n    exy = ay-ax;   exz = az-ax;\t  ezy = ay-az;\r\n\r\n    vec3 cellPos;\r\n    for(int n = 0; n < CELL_COUNT.x + CELL_COUNT.y + CELL_COUNT.z; n++)\r\n    {\r\n        if(n >= ax+ay+az+1)\r\n            break;\r\n\r\n        cellPos = SMOKEBB_START + vec3(x,y,z)*cellSize + cellSize/2.0;\r\n        intersectRayCubeNorm(ray.start, ray.dir, cellPos, cellSize/2.0, tt, n0, n1);\r\n        if(tt.x < tt.y)\r\n        {\r\n            cellPos = ray.start + ray.dir * tt.x - n0 * EPSILON;\r\n            // totalDense += smokeDense(cellPos) * (tt.y-tt.x);\r\n            totalDense += smokeDense(cellPos);\r\n        }\r\n        else\r\n        {\r\n            cellPos = ray.start + ray.dir * tt.x + n0 * EPSILON;\r\n            // totalDense += smokeDense(cellPos) * length(cellPos - ray.start);\r\n            totalDense += smokeDense(cellPos);\r\n        }\r\n        \r\n        // Update\r\n        if ( exy < 0 ) {\r\n            if ( exz < 0 ) {\r\n            x += sx;\r\n            exy += by; exz += bz;\r\n            }\r\n            else  {\r\n            z += sz;\r\n            exz -= bx; ezy += by;\r\n            }\r\n        }\r\n        else {\r\n            if ( ezy < 0 ) {\r\n            z += sz;\r\n            exz -= bx; ezy += by;\r\n            }\r\n            else  {\r\n            y += sy;\r\n            exy -= bx; ezy -= bz;\r\n            }\r\n        }\r\n    }\r\n    return totalDense;\r\n}\r\n\r\nvec3 renderScene(Ray ray)\r\n{\r\n    vec2 tt;\r\n    vec3 n0, n1;\r\n    if(intersectRayCubeNorm(ray.start, ray.dir, SCENEBB_POS, SCENEBB_SIZE, tt, n0, n1) > 0.0)\r\n    {\r\n        if(tt.x < tt.y)\r\n        {\r\n            return vec3(checkerboardTexture(ray.start + ray.dir * tt.x - n0 * EPSILON));\r\n        }\r\n        else\r\n        {\r\n            return vec3(checkerboardTexture(ray.start + ray.dir * tt.x + n0 * EPSILON));\r\n        }\r\n    }\r\n    else\r\n    {\r\n        return vec3(0.75);\r\n    }\r\n}\r\n\r\nvec3 renderSkyBox(Ray ray)\r\n{\r\n    return vec3(0.75);\r\n}\r\n\r\nvec3 render(Ray ray)\r\n{\r\n    vec2 sceneDist;\r\n    vec2 smokeDist;\r\n\r\n    if (intersectRayCube(ray.start, ray.dir, SCENEBB_POS, SCENEBB_SIZE, sceneDist) > 0.0)\r\n    {\r\n        vec3 sceneColor = renderScene(ray);\r\n        if(intersectRayCube(ray.start, ray.dir, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP-SMOKEBB_START)/2.0, smokeDist) > 0.0)\r\n        {\r\n            // Hit both\r\n            if(sceneDist.x <= smokeDist.x)\r\n            {\r\n                return sceneColor;\r\n            }\r\n            else\r\n            {\r\n                float totalDense = densityTrace(ray);\r\n                return absorb(sceneColor, totalDense);\r\n            }\r\n        }\r\n        else\r\n        {\r\n            // Hit only scene\r\n            return sceneColor;\r\n        }\r\n    }\r\n    else\r\n    {\r\n        vec3 skyboxColor = renderSkyBox(ray);\r\n        if(intersectRayCube(ray.start, ray.dir, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP-SMOKEBB_START)/2.0, smokeDist) > 0.0)\r\n        {\r\n            // Hit smoke\r\n            float totalDense = densityTrace(ray);\r\n            return absorb(skyboxColor, totalDense);\r\n        }\r\n        else\r\n        {\r\n            // Hit only skybox\r\n            return skyboxColor;\r\n        }\r\n    }\r\n}\r\n\r\nvoid main() {\r\n    Ray ray;\r\n    ray.start = u_cam_pos;\r\n    ray.dir = rayDirection();\r\n    ray.depth = 0.0;\r\n\r\n    gl_FragColor = vec4(render(ray), 1.0);\r\n}"
 
 /***/ }
 /******/ ]);
