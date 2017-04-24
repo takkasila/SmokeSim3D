@@ -152,6 +152,7 @@ window.addEventListener('load', function() {
     myPlaneMaterial.uniforms.topColor.value = new THREE.Vector3(param.topColorGUI[0]/255, param.topColorGUI[1]/255, param.topColorGUI[2]/255);
     myPlaneMaterial.uniforms.btmColor.value = new THREE.Vector3(param.btmColorGUI[0]/255, param.btmColorGUI[1]/255, param.btmColorGUI[2]/255);
     
+    var t1, t2, diff, sum = 0, frameCount = 1;
     (function tick() {
         controls.update();
         stats.begin();
@@ -159,10 +160,18 @@ window.addEventListener('load', function() {
 
         if(param.simulating)
         {
+            t1 = Date.now()
             fluid.add_flow(0.47, 0.53, 0.0, 0.05, 0.47, 0.53, 1, 0, 1, 0)
             fluid.add_flow(0.47, 0.53, 0.47, 0.53, 0.0, 0.05, 0.8, 0, 0, 1)
             fluid.update(0.05)
             dataTex.needsUpdate = true;
+
+            t2 = Date.now()
+            diff = t2-t1
+            sum += diff
+            console.log("Frame: ", diff)
+            console.log("Average: ", sum/frameCount)
+            frameCount++;
         }
 
         renderer.render(scene, camera);

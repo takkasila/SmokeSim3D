@@ -51,7 +51,7 @@ float smokeDense(ivec3 p)
 vec3 absorb(vec3 originColor, float amount)
 {
     float fogAmount = 1.0 - exp(-amount * 0.5);
-    vec3 fogColor = vec3(1.0, 0.0, 0.0);
+    vec3 fogColor = vec3(0.4, 0.4, 0.4);
     return mix(originColor, fogColor, fogAmount);
 }
 
