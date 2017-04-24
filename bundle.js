@@ -88,8 +88,6 @@
 	    controls.zoomSpeed = 1.0;
 	    controls.panSpeed = 2.0;
 	
-	    var gui = new _datGui2.default.GUI();
-	
 	    camera.position.set(70, 70, 70);
 	    var lookAt = new Float32Array([32, 0, 32]);
 	    camera.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
@@ -168,15 +166,28 @@
 	        myPlaneMaterial.uniforms.u_screen_height.value = window.innerHeight;
 	    });
 	
+	    var gui = new _datGui2.default.GUI();
+	    var param = {
+	        simulating: true,
+	        reset: function reset() {
+	            fluid.reset();
+	            dataTex.needsUpdate = true;
+	        }
+	    };
+	    gui.add(param, 'simulating', true);
+	    gui.add(param, 'reset');
+	
 	    (function tick() {
 	        controls.update();
 	        stats.begin();
 	        myPlaneMaterial.uniforms.u_cam_pos.value = camera.position;
 	
-	        fluid.add_flow(0.47, 0.53, 0.0, 0.05, 0.47, 0.53, 1, 0, 1, 0);
-	        fluid.add_flow(0.47, 0.53, 0.47, 0.53, 0.0, 0.05, 0.8, 0, 0, 1);
-	        fluid.update(0.05);
-	        dataTex.needsUpdate = true;
+	        if (param.simulating) {
+	            fluid.add_flow(0.47, 0.53, 0.0, 0.05, 0.47, 0.53, 1, 0, 1, 0);
+	            fluid.add_flow(0.47, 0.53, 0.47, 0.53, 0.0, 0.05, 0.8, 0, 0, 1);
+	            fluid.update(0.05);
+	            dataTex.needsUpdate = true;
+	        }
 	
 	        renderer.render(scene, camera);
 	        stats.end();
@@ -4870,6 +4881,15 @@
 	                }
 	            }
 	        }
+	    }, {
+	        key: 'reset',
+	        value: function reset() {
+	            this.dense.reset();
+	            this.speed_x.reset();
+	            this.speed_y.reset();
+	            this.speed_z.reset();
+	            updateDenseUI8();
+	        }
 	    }]);
 	
 	    return FluidSolver;
@@ -4923,6 +4943,18 @@
 	                for (var j = iy_begin; j <= iy_end; j++) {
 	                    for (var k = iz_begin; k <= iz_end; k++) {
 	                        this.data_prev[i + k * (this.width + 2) + j * (this.width + 2) * (this.height + 2)] = value;
+	                    }
+	                }
+	            }
+	        }
+	    }, {
+	        key: "reset",
+	        value: function reset() {
+	            for (var i = 0; i < this.width + 2; i++) {
+	                for (var j = 0; j < this.tall + 2; j++) {
+	                    for (var k = 0; k < this.height + 2; k++) {
+	                        this.data[i + k * (this.width + 2) + j * (this.width + 2) * (this.height + 2)] = 0;
+	                        this.data_prev[i + k * (this.width + 2) + j * (this.width + 2) * (this.height + 2)] = 0;
 	                    }
 	                }
 	            }
