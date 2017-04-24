@@ -12,11 +12,11 @@ uniform float u_screen_height;
 varying vec2 f_uv;
 
 #define EPSILON 0.0001
-#define SCENEBB_POS vec3(16.0, -1.0, 16.0)
+#define SCENEBB_POS vec3(32.0, -1.0, 32.0)
 #define SCENEBB_SIZE vec3(32.0, 1.0, 32.0)
 #define SMOKEBB_START vec3(0.0)
-#define SMOKEBB_STOP vec3(32.0, 1.0, 32.0)
-#define CELL_COUNT ivec3(32, 1, 32)
+#define SMOKEBB_STOP vec3(64.0)
+#define CELL_COUNT ivec3(64)
 
 struct Ray {
     vec3 start;
@@ -26,19 +26,15 @@ struct Ray {
 
 float checkerboardTexture(vec3 p)
 {
-    p = floor(mod(p, 2.0));
-    // return mod(p.x+p.y+p.z, 2.0);
-    return 0.9;
+    p = floor(mod(p/4.0, 2.0));
+    return mod(p.x+p.y+p.z, 2.0);
 }
 
-ivec2 AT(ivec3 p)
+// Input cell index
+float smokeDense(ivec3 p)
 {
-    return ivec2(p.x+p.z*CELL_COUNT.x+p.y*CELL_COUNT.x*CELL_COUNT.z, 1);
-}
-
-float smokeDense(vec3 p)
-{
-    vec2 tmp = vec2(p.x/32.0,p.z/32.0);
+    vec2 tmp = vec2(float(p.x)/float(CELL_COUNT.x)
+                    , float(p.z)/float(CELL_COUNT.z * CELL_COUNT.y) + (float(p.y))/float(CELL_COUNT.y));
     return texture2D(u_texture, tmp).r;
 }
 
@@ -183,19 +179,19 @@ float densityTrace(Ray ray)
         if(n >= ax+ay+az+1)
             break;
 
-        cellPos = SMOKEBB_START + vec3(x,y,z)*cellSize + cellSize/2.0;
+        cellPos = vec3(x,y,z)*cellSize + cellSize/2.0;
         intersectRayCubeNorm(ray.start, ray.dir, cellPos, cellSize/2.0, tt, n0, n1);
         if(tt.x < tt.y)
         {
-            cellPos = ray.start + ray.dir * tt.x - n0 * EPSILON;
+            // cellPos = ray.start + ray.dir * tt.x - n0 * EPSILON;
             // totalDense += smokeDense(cellPos) * (tt.y-tt.x);
-            totalDense += smokeDense(cellPos);
+            totalDense += smokeDense(ivec3(x,y,z));
         }
         else
         {
-            cellPos = ray.start + ray.dir * tt.x + n0 * EPSILON;
+            // cellPos = ray.start + ray.dir * tt.x + n0 * EPSILON;
             // totalDense += smokeDense(cellPos) * length(cellPos - ray.start);
-            totalDense += smokeDense(cellPos);
+            totalDense += smokeDense(ivec3(x,y,z));
         }
         
         // Update

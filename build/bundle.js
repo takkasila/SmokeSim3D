@@ -54,12 +54,16 @@
 	
 	var _statsJs2 = _interopRequireDefault(_statsJs);
 	
+	var _fluid_solver = __webpack_require__(5);
+	
+	var _fluid_solver2 = _interopRequireDefault(_fluid_solver);
+	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 	
-	__webpack_require__(5);
+	__webpack_require__(7);
 	
-	var THREE = __webpack_require__(6);
-	var OrbitControls = __webpack_require__(7)(THREE);
+	var THREE = __webpack_require__(8);
+	var OrbitControls = __webpack_require__(9)(THREE);
 	
 	window.addEventListener('load', function () {
 	    var stats = new _statsJs2.default();
@@ -86,23 +90,21 @@
 	
 	    var gui = new _datGui2.default.GUI();
 	
-	    camera.position.set(32, 32, 32);
-	    var lookAt = new Float32Array([16, 0, 16]);
+	    camera.position.set(70, 70, 70);
+	    var lookAt = new Float32Array([32, 0, 32]);
 	    camera.lookAt(new THREE.Vector3(lookAt[0], lookAt[1], lookAt[2]));
 	
-	    controls.target.set(0, 0, 0);
+	    controls.target.set(lookAt[0], lookAt[1], lookAt[2]);
 	
-	    //Dummy Data
-	    var side = 32;
-	    var amount = Math.pow(side, 2);
-	    var data = new Uint8Array(amount);
-	    for (var i = 0; i < amount; i++) {
-	        data[i] = Math.random() * 256;
-	    }
-	    var dataTex = new THREE.DataTexture(data, side, side, THREE.LuminanceFormat, THREE.UnsignedByteType);
-	    dataTex.magFilter = THREE.NearestFilter;
+	    var fluid = new _fluid_solver2.default(64, 64, 64, 0);
+	    fluid.add_flow(0.47, 0.53, 0.0, 0.05, 0.47, 0.53, 0.8, 0, 1, 0);
+	    fluid.add_flow(0.47, 0.53, 0.47, 0.53, 0.0, 0.05, 0.8, 0, 0, 1);
+	    fluid.update(0.05);
+	
+	    var dataTex = new THREE.DataTexture(fluid.denseUI8, fluid.width, fluid.height * fluid.tall, THREE.LuminanceFormat, THREE.UnsignedByteType);
+	    dataTex.magFilter = THREE.LinearFilter;
 	    dataTex.needsUpdate = true;
-	    //=======================================
+	
 	    var myPlaneMaterial = new THREE.ShaderMaterial({
 	        uniforms: {
 	            u_buffer: {
@@ -150,8 +152,8 @@
 	                value: dataTex
 	            }
 	        },
-	        vertexShader: __webpack_require__(8),
-	        fragmentShader: __webpack_require__(9)
+	        vertexShader: __webpack_require__(10),
+	        fragmentShader: __webpack_require__(11)
 	    });
 	    var myPlaneGeo = new THREE.PlaneBufferGeometry(2, 2);
 	    var myPlane = new THREE.Mesh(myPlaneGeo, myPlaneMaterial);
@@ -170,6 +172,12 @@
 	        controls.update();
 	        stats.begin();
 	        myPlaneMaterial.uniforms.u_cam_pos.value = camera.position;
+	
+	        fluid.add_flow(0.47, 0.53, 0.0, 0.05, 0.47, 0.53, 1, 0, 1, 0);
+	        fluid.add_flow(0.47, 0.53, 0.47, 0.53, 0.0, 0.05, 0.8, 0, 0, 1);
+	        fluid.update(0.05);
+	        dataTex.needsUpdate = true;
+	
 	        renderer.render(scene, camera);
 	        stats.end();
 	        requestAnimationFrame(tick);
@@ -4624,10 +4632,317 @@
 /* 5 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__.p + "index.html";
+	'use strict';
+	
+	Object.defineProperty(exports, "__esModule", {
+	    value: true
+	});
+	
+	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	
+	var _fluid_quantity = __webpack_require__(6);
+	
+	var _fluid_quantity2 = _interopRequireDefault(_fluid_quantity);
+	
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	
+	var FluidSolver = function () {
+	    /**
+	     * Width: x; Tall: y; Height: z
+	     */
+	    function FluidSolver(width, tall, height, diffusion_rate) {
+	        _classCallCheck(this, FluidSolver);
+	
+	        this.width = width;
+	        this.height = height;
+	        this.tall = tall;
+	        this.diffusion_rate = diffusion_rate;
+	        this.cellSize = 1.0 / Math.min(width, height, tall);
+	
+	        this.dense = new _fluid_quantity2.default(this.width, this.height, this.tall, this.cellSize);
+	        this.speed_x = new _fluid_quantity2.default(this.width, this.height, this.tall, this.cellSize);
+	        this.speed_y = new _fluid_quantity2.default(this.width, this.height, this.tall, this.cellSize);
+	        this.speed_z = new _fluid_quantity2.default(this.width, this.height, this.tall, this.cellSize);
+	
+	        this.totalBlock = (this.width + 2) * (this.height + 2) * (this.tall + 2);
+	        this.p = new Array();
+	        this.p.length = this.totalBlock;
+	        this.p.fill(0.0);
+	        this.div = new Array();
+	        this.div.length = this.totalBlock;
+	        this.div.fill(0.0);
+	
+	        this.denseUI8 = new Uint8Array(this.width * this.height * this.tall);
+	    }
+	
+	    _createClass(FluidSolver, [{
+	        key: 'update',
+	        value: function update(timeStep) {
+	            this.velocityStep(timeStep);
+	            this.densityStep(timeStep);
+	            this.updateDenseUI8();
+	        }
+	    }, {
+	        key: 'velocityStep',
+	        value: function velocityStep(timeStep) {
+	            this.diffuse(this.speed_x.data, this.speed_x.data_prev, timeStep, true, false, false);
+	            this.diffuse(this.speed_y.data, this.speed_y.data_prev, timeStep, false, true, false);
+	            this.diffuse(this.speed_z.data, this.speed_z.data_prev, timeStep, false, false, true);
+	            this.project(this.speed_x.data, this.speed_y.data, this.speed_z.data);
+	            this.advect(this.speed_x.data_prev, this.speed_x.data, this.speed_x.data, this.speed_y.data, this.speed_z.data, timeStep, true, false, false);
+	            this.advect(this.speed_y.data_prev, this.speed_y.data, this.speed_x.data, this.speed_y.data, this.speed_z.data, timeStep, false, true, false);
+	            this.advect(this.speed_z.data_prev, this.speed_z.data, this.speed_x.data, this.speed_y.data, this.speed_z.data, timeStep, false, true, false);
+	            this.project(this.speed_x.data_prev, this.speed_y.data_prev, this.speed_z.data_prev);
+	            this.SWAP(this.speed_x.data, this.speed_x.data_prev);
+	            this.SWAP(this.speed_y.data, this.speed_y.data_prev);
+	            this.SWAP(this.speed_z.data, this.speed_z.data_prev);
+	        }
+	    }, {
+	        key: 'densityStep',
+	        value: function densityStep(timeStep) {
+	            this.diffuse(this.dense.data, this.dense.data_prev, timeStep, false, false, false);
+	            this.advect(this.dense.data_prev, this.dense.data, this.speed_x.data, this.speed_y.data, this.speed_z.data, timeStep, false, false, false);
+	            this.SWAP(this.dense.data, this.dense.data_prev);
+	        }
+	    }, {
+	        key: 'diffuse',
+	        value: function diffuse(data, data_prev, timeStep, u_cond, v_cond, w_cond) {
+	            var coeff1 = timeStep * this.diffusion_rate * this.width * this.height * this.tall;
+	            var coeff2 = 1 + 6 * coeff1;
+	            this.linear_solver(data, data_prev, coeff1, coeff2, u_cond, v_cond, w_cond);
+	        }
+	    }, {
+	        key: 'advect',
+	        value: function advect(data, data_prev, u, v, w, timeStep, u_cond, v_cond, w_cond) {
+	            var x, y, z;
+	            var i0, i1, j0, j1, k0, k1;
+	            for (var k = 1; k <= this.height; k++) {
+	                for (var j = 1; j <= this.tall; j++) {
+	                    for (var i = 1; i <= this.width; i++) {
+	                        //Traceback particle
+	                        x = i - u[this.AT(i, j, k)] * timeStep * this.width;
+	                        y = j - v[this.AT(i, j, k)] * timeStep * this.tall;
+	                        z = k - w[this.AT(i, j, k)] * timeStep * this.height;
+	                        //Screen boundary condition
+	                        if (x < 0.5) x = 0.5;
+	                        if (x > this.width + 0.5) x = this.width + 0.5;
+	                        if (y < 0.5) y = 0.5;
+	                        if (y > this.tall + 0.5) y = this.tall + 0.5;
+	                        if (z < 0.5) z = 0.5;
+	                        if (z > this.height + 0.5) z = this.height + 0.5;
+	                        //Find four closest neighbor
+	                        i0 = Math.round(x);
+	                        i1 = i0 + 1;
+	                        j0 = Math.round(y);
+	                        j1 = j0 + 1;
+	                        k0 = Math.round(z);
+	                        k1 = k0 + 1;
+	                        //Interpolate eight closest neighbor
+	                        data[this.AT(i, j, k)] = this.lerp(
+	                        // Face 1
+	                        this.lerp(this.lerp(data_prev[this.AT(i0, j0, k0)], data_prev[(i1, j0, k0)], x - i0), this.lerp(data_prev[this.AT(i0, j1, k0)], data_prev[(i1, j1, k0)], x - i0), y - j0),
+	                        // Face 2
+	                        this.lerp(this.lerp(data_prev[this.AT(i0, j0, k1)], data_prev[(i1, j0, k1)], x - i0), this.lerp(data_prev[this.AT(i0, j1, k1)], data_prev[(i1, j1, k1)], x - i0), y - j0), z - k0);
+	                    }
+	                }
+	            }this.set_boundary(data, u_cond, v_cond, w_cond);
+	        }
+	    }, {
+	        key: 'project',
+	        value: function project(u, v, w) {
+	            for (var k = 1; k <= this.height; k++) {
+	                for (var j = 1; j <= this.tall; j++) {
+	                    for (var i = 1; i <= this.width; i++) {
+	                        this.div[this.AT(i, j, k)] = -0.333333 * this.cellSize * (u[this.AT(i + 1, j, k)] - u[this.AT(i - 1, j, k)] + v[this.AT(i, j + 1, k)] - v[this.AT(i, j - 1, k)] + w[this.AT(i, j, k + 1)] - w[this.AT(i, j, k - 1)]);
+	                        this.p[this.AT(i, j, k)] = 0;
+	                    }
+	                }
+	            }this.set_boundary(this.div, false, false, false);
+	            this.set_boundary(this.p, false, false, false);
+	
+	            this.linear_solver(this.p, this.div, 1, 6, false, false, false);
+	
+	            for (var k = 1; k <= this.height; k++) {
+	                for (var j = 1; j <= this.tall; j++) {
+	                    for (var i = 1; i <= this.width; i++) {
+	                        u[this.AT(i, j, k)] -= 0.5 * (this.p[this.AT(i + 1, j, k)] - this.p[this.AT(i - 1, j, k)]) / this.cellSize;
+	                        v[this.AT(i, j, k)] -= 0.5 * (this.p[this.AT(i, j + 1, k)] - this.p[this.AT(i, j - 1, k)]) / this.cellSize;
+	                        w[this.AT(i, j, k)] -= 0.5 * (this.p[this.AT(i, j, k + 1)] - this.p[this.AT(i, j, k - 1)]) / this.cellSize;
+	                    }
+	                }
+	            }this.set_boundary(u, true, false, false);
+	            this.set_boundary(v, false, true, false);
+	            this.set_boundary(w, false, false, true);
+	        }
+	    }, {
+	        key: 'linear_solver',
+	        value: function linear_solver(data, data_prev, coeff1, coeff2, u_cond, v_cond, w_cond) {
+	            for (var step = 0; step < 20; step++) {
+	                for (var j = 1; j <= this.tall; j++) {
+	                    for (var k = 1; k <= this.height; k++) {
+	                        for (var i = 1; i <= this.width; i++) {
+	                            data[this.AT(i, j, k)] = (data_prev[this.AT(i, j, k)] + coeff1 * (data[this.AT(i - 1, j, k)] + data[this.AT(i + 1, j, k)] + data[this.AT(i, j - 1, k)] + data[this.AT(i, j + 1, k)] + data[this.AT(i, j, k - 1)] + data[this.AT(i, j, k + 1)])) / coeff2;
+	                        }
+	                    }
+	                }this.set_boundary(data, u_cond, v_cond, w_cond);
+	            }
+	        }
+	    }, {
+	        key: 'set_boundary',
+	        value: function set_boundary(data, u_cond, v_cond, w_cond) {
+	            //Edge plane
+	            var coef_u = u_cond == true ? -1 : 1;
+	            var coef_v = v_cond == true ? -1 : 1;
+	            var coef_w = w_cond == true ? -1 : 1;
+	            //xy plane, w cond
+	            for (var i = 1; i <= this.width; i++) {
+	                for (var j = 1; j <= this.tall; j++) {
+	                    data[this.AT(i, j, 0)] = data[this.AT(i, j, 1)] * coef_w;
+	                    data[this.AT(i, j, this.height + 1)] = data[this.AT(i, j, this.height)] * coef_w;
+	                }
+	            } //xz plane, v cond
+	            for (var i = 1; i <= this.width; i++) {
+	                for (var k = 1; k <= this.height; k++) {
+	                    data[this.AT(i, 0, k)] = data[this.AT(i, 1, k)] * coef_v;
+	                    data[this.AT(i, this.tall + 1, k)] = data[this.AT(i, this.tall, k)] * coef_v;
+	                }
+	            } //yz plane, u cond
+	            for (var j = 1; j <= this.tall; j++) {
+	                for (var k = 1; k <= this.height; k++) {
+	                    data[this.AT(0, j, k)] = data[this.AT(1, j, k)] * coef_u;
+	                    data[this.AT(this.width + 1, j, k)] = data[this.AT(this.width, j, k)] * coef_u;
+	                }
+	            } //Corner
+	            //0     , 0     , 0
+	            data[this.AT(0, 0, 0)] = (data[this.AT(1, 0, 0) + data[this.AT(0, 1, 0)]] + data[this.AT(0, 0, 1)]) / 3;
+	            //width , 0     , 0
+	            data[this.AT(this.width + 1, 0, 0)] = (data[this.AT(this.width, 0, 0)] + data[this.AT(this.width + 1, 1, 0)] + data[this.AT(this.width + 1, 0, 1)]) / 3;
+	            //0     , tall  , 0
+	            data[this.AT(0, this.tall + 1, 0)] = (data[this.AT(1, this.tall + 1, 0)] + data[this.AT(0, this.tall, 0)] + data[this.AT(0, this.tall + 1, 1)]) / 3;
+	            //width , tall  , 0
+	            data[this.AT(this.width + 1, this.tall + 1, 0)] = (data[this.AT(this.width, this.tall + 1, 0)] + data[this.AT(this.width + 1, this.tall, 0)] + data[this.AT(this.width + 1, this.tall + 1, 1)]) / 3;
+	            //0     , 0     , height
+	            data[this.AT(0, 0, this.height + 1)] = (data[this.AT(1, 0, this.height + 1)] + data[this.AT(0, 1, this.height + 1)] + data[this.AT(0, 0, this.height)]) / 3;
+	            //width , 0     , height
+	            data[this.AT(this.width + 1, 0, this.height + 1)] = (data[this.AT(this.width, 0, this.height + 1)] + data[this.AT(this.width + 1, 1, this.height + 1)] + data[this.AT(this.width + 1, 0, this.height)]) / 3;
+	            //0     , tall  , height
+	            data[this.AT(0, this.tall + 1, this.height + 1)] = (data[this.AT(1, this.tall + 1, this.height + 1)] + data[this.AT(0, this.tall, this.height + 1)] + data[this.AT(0, this.tall + 1, this.height)]) / 3;
+	            //width , tall  , height
+	            data[this.AT(this.width + 1, this.tall + 1, this.height + 1)] = (data[this.AT(this.width, this.tall + 1, this.height + 1)] + data[this.AT(this.width + 1, this.tall, this.height + 1)] + data[this.AT(this.width + 1, this.tall + 1, this.height)]) / 3;
+	        }
+	    }, {
+	        key: 'add_flow',
+	        value: function add_flow(x_begin, x_end, y_begin, y_end, z_begin, z_end, dense, speed_x, speed_y, speed_z) {
+	            this.dense.add_source(x_begin, x_end, y_begin, y_end, z_begin, z_end, dense);
+	            this.speed_x.add_source(x_begin, x_end, y_begin, y_end, z_begin, z_end, speed_x);
+	            this.speed_y.add_source(x_begin, x_end, y_begin, y_end, z_begin, z_end, speed_y);
+	            this.speed_z.add_source(x_begin, x_end, y_begin, y_end, z_begin, z_end, speed_z);
+	        }
+	    }, {
+	        key: 'AT',
+	        value: function AT(i, j, k) {
+	            return i + k * (this.width + 2) + j * (this.width + 2) * (this.height + 2);
+	        }
+	    }, {
+	        key: 'SWAP',
+	        value: function SWAP(a, b) {
+	            var temp = a;
+	            a = b;
+	            b = temp;
+	        }
+	    }, {
+	        key: 'lerp',
+	        value: function lerp(a, b, amount) {
+	            return a + (b - a) * Math.min(Math.max(amount, 0), 1);
+	        }
+	    }, {
+	        key: 'updateDenseUI8',
+	        value: function updateDenseUI8() {
+	            var count = 0;
+	            for (var y = 1; y <= this.tall; y++) {
+	                for (var z = 1; z <= this.height; z++) {
+	                    for (var x = 1; x <= this.width; x++) {
+	                        this.denseUI8[count] = this.dense.data[this.AT(x, y, z)] * 255;
+	                        count++;
+	                    }
+	                }
+	            }
+	        }
+	    }]);
+	
+	    return FluidSolver;
+	}();
+	
+	exports.default = FluidSolver;
+	;
 
 /***/ },
 /* 6 */
+/***/ function(module, exports) {
+
+	"use strict";
+	
+	Object.defineProperty(exports, "__esModule", {
+	    value: true
+	});
+	
+	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	
+	var FluidQuantity = function () {
+	    function FluidQuantity(width, height, tall, cellSize) {
+	        _classCallCheck(this, FluidQuantity);
+	
+	        this.width = width;
+	        this.height = height;
+	        this.tall = tall;
+	        this.cellSize = cellSize;
+	        this.totalBlock = (this.width + 2) * (this.height + 2) * (this.tall + 2);
+	        this.data_prev = new Array();
+	        this.data_prev.length = this.totalBlock;
+	        this.data = new Array();
+	        this.data.length = this.totalBlock;
+	        this.data_prev.fill(0);
+	        this.data.fill(0);
+	    }
+	
+	    _createClass(FluidQuantity, [{
+	        key: "add_source",
+	        value: function add_source(x_begin, x_end, y_begin, y_end, z_begin, z_end, value) {
+	            var ix_begin = Math.round(x_begin * (this.width - 1) + 1);
+	            var ix_end = Math.round(x_end * (this.width - 1) + 1);
+	            var iy_begin = Math.round(y_begin * (this.tall - 1) + 1);
+	            var iy_end = Math.round(y_end * (this.tall - 1) + 1);
+	            var iz_begin = Math.round(z_begin * (this.height - 1) + 1);
+	            var iz_end = Math.round(z_end * (this.height - 1) + 1);
+	
+	            for (var i = ix_begin; i <= ix_end; i++) {
+	                for (var j = iy_begin; j <= iy_end; j++) {
+	                    for (var k = iz_begin; k <= iz_end; k++) {
+	                        this.data_prev[i + k * (this.width + 2) + j * (this.width + 2) * (this.height + 2)] = value;
+	                    }
+	                }
+	            }
+	        }
+	    }]);
+	
+	    return FluidQuantity;
+	}();
+	
+	exports.default = FluidQuantity;
+	;
+
+/***/ },
+/* 7 */
+/***/ function(module, exports, __webpack_require__) {
+
+	module.exports = __webpack_require__.p + "index.html";
+
+/***/ },
+/* 8 */
 /***/ function(module, exports, __webpack_require__) {
 
 	(function (global, factory) {
@@ -47933,7 +48248,7 @@
 
 
 /***/ },
-/* 7 */
+/* 9 */
 /***/ function(module, exports) {
 
 	module.exports = function( THREE ) {
@@ -48959,16 +49274,16 @@
 
 
 /***/ },
-/* 8 */
+/* 10 */
 /***/ function(module, exports) {
 
 	module.exports = "varying vec2 f_uv;\r\nvoid main() {\r\n    f_uv = uv;\r\n    // gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\r\n    gl_Position = vec4(position, 1.0);\r\n}"
 
 /***/ },
-/* 9 */
+/* 11 */
 /***/ function(module, exports) {
 
-	module.exports = "uniform vec3 u_cam_pos;\r\nuniform vec3 u_cam_up;\r\nuniform vec3 u_cam_lookAt;\r\nuniform float u_cam_vfov;\r\nuniform float u_cam_near;\r\nuniform float u_cam_far;\r\n\r\nuniform sampler2D u_texture;\r\nuniform float u_screen_width;\r\nuniform float u_screen_height;\r\n\r\nvarying vec2 f_uv;\r\n\r\n#define EPSILON 0.0001\r\n#define SCENEBB_POS vec3(16.0, -1.0, 16.0)\r\n#define SCENEBB_SIZE vec3(32.0, 1.0, 32.0)\r\n#define SMOKEBB_START vec3(0.0)\r\n#define SMOKEBB_STOP vec3(32.0, 1.0, 32.0)\r\n#define CELL_COUNT ivec3(32, 1, 32)\r\n\r\nstruct Ray {\r\n    vec3 start;\r\n    vec3 dir;\r\n    float depth;\r\n};\r\n\r\nfloat checkerboardTexture(vec3 p)\r\n{\r\n    p = floor(mod(p, 2.0));\r\n    // return mod(p.x+p.y+p.z, 2.0);\r\n    return 0.9;\r\n}\r\n\r\nivec2 AT(ivec3 p)\r\n{\r\n    return ivec2(p.x+p.z*CELL_COUNT.x+p.y*CELL_COUNT.x*CELL_COUNT.z, 1);\r\n}\r\n\r\nfloat smokeDense(vec3 p)\r\n{\r\n    vec2 tmp = vec2(p.x/32.0,p.z/32.0);\r\n    return texture2D(u_texture, tmp).r;\r\n}\r\n\r\nvec3 absorb(vec3 originColor, float amount)\r\n{\r\n    float fogAmount = 1.0 - exp(-amount * 0.5);\r\n    vec3 fogColor = vec3(1.0, 0.0, 0.0);\r\n    return mix(originColor, fogColor, fogAmount);\r\n}\r\n\r\nvec3 If(bvec3 cond, vec3 resT, vec3 resF)\r\n{\r\n    vec3 res;\r\n    res.x = cond.x ? resT.x : resF.x;\r\n    res.y = cond.y ? resT.y : resF.y;\r\n    res.z = cond.z ? resT.z : resF.z;    \r\n\r\n    return res;\r\n}\r\n\r\nfloat intersectRayCube(vec3 rp, vec3 rd, vec3 cp, vec3 cth, out vec2 t)\r\n{\t\r\n\trp -= cp;\r\n\t\r\n\tvec3 m = 1.0 / -rd;\r\n\tvec3 o = If(lessThan(rd, vec3(0.0)), -cth, cth);\r\n\t\r\n\tvec3 uf = (rp + o) * m;\r\n\tvec3 ub = (rp - o) * m;\r\n\t\r\n\tt.x = max(uf.x, max(uf.y, uf.z));\r\n\tt.y = min(ub.x, min(ub.y, ub.z));\r\n\t\r\n\t// if(ray start == inside cube) \r\n\tif(t.x < 0.0 && t.y > 0.0) {t.xy = t.yx;  return 1.0;}\r\n\t\r\n\treturn t.y < t.x ? 0.0 : (t.x > 0.0 ? 1.0 : -1.0);\r\n}\r\n\r\nfloat intersectRayCubeNorm(vec3 rp, vec3 rd, vec3 cp, vec3 cth, out vec2 t, out vec3 n0, out vec3 n1)\r\n{\t\r\n\trp -= cp;\r\n\t\r\n\tvec3 m = 1.0 / -rd;\r\n    vec3 os = If(lessThan(rd, vec3(0.0)), vec3(1.0), vec3(-1.0));\r\n    //vec3 os = sign(-rd);\r\n\tvec3 o = -cth * os;\r\n\t\r\n    \r\n\tvec3 uf = (rp + o) * m;\r\n\tvec3 ub = (rp - o) * m;\r\n\t\r\n\t//t.x = max(uf.x, max(uf.y, uf.z));\r\n\t//t.y = min(ub.x, min(ub.y, ub.z));\r\n\t\r\n    if(uf.x > uf.y) {t.x = uf.x; n0 = vec3(os.x, 0.0, 0.0);} else \r\n                    {t.x = uf.y; n0 = vec3(0.0, os.y, 0.0);}\r\n    if(uf.z > t.x ) {t.x = uf.z; n0 = vec3(0.0, 0.0, os.z);}\r\n    \r\n    if(ub.x < ub.y) {t.y = ub.x; n1 = vec3(os.x, 0.0, 0.0);} else \r\n                    {t.y = ub.y; n1 = vec3(0.0, os.y, 0.0);}\r\n    if(ub.z < t.y ) {t.y = ub.z; n1 = vec3(0.0, 0.0, os.z);}\r\n    \r\n    \r\n\t// if(ray start == inside cube) \r\n\tif(t.x < 0.0 && t.y > 0.0) \r\n    {\r\n        t.xy = t.yx;  \r\n        \r\n        vec3 n00 = n0;\r\n        n0 = n1;\r\n        n1 = n00;\r\n        \r\n        return 1.0;\r\n    }\r\n\t\r\n\treturn t.y < t.x ? 0.0 : (t.x > 0.0 ? 1.0 : -1.0);\r\n}\r\n\r\nvec3 rayDirection()\r\n{\r\n    // Creat camera plane\r\n    vec2 uv = f_uv * 2.0 - 1.0;\r\n    vec3 view_n = normalize(u_cam_pos - u_cam_lookAt);\r\n    vec3 view_u = normalize(cross(u_cam_up, view_n));\r\n    vec3 view_v = normalize(cross(view_n, view_u));\r\n\r\n    vec3 plane_top = view_v * u_cam_near * tan(radians(u_cam_vfov)/2.0);\r\n    vec3 plane_right = view_u * (u_screen_width/u_screen_height) * length(plane_top);\r\n    return normalize(-view_n * u_cam_near + plane_right * uv.x + plane_top * uv.y);\r\n}\r\n\r\n// Volxel traversal along 3D line\r\nfloat densityTrace(Ray ray)\r\n{\r\n    float totalDense = 0.0;\r\n    vec3 cellSize = (SMOKEBB_STOP - SMOKEBB_START) / float(CELL_COUNT);\r\n    vec2 tt;\r\n    vec3 n0, n1;\r\n    int x, y, z, dx, dy, dz;\r\n    if(intersectRayCubeNorm(ray.start, ray.dir, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP - SMOKEBB_START)/2.0, tt, n0, n1) > 0.0)\r\n    {\r\n        // Enter cube to reduce surface error\r\n        vec3 startPos, endPos;\r\n        if(tt.x < tt.y)\r\n        {\r\n            startPos = ray.start + ray.dir * tt.x - n0 * EPSILON;\r\n            endPos = ray.start + ray.dir * tt.y + n1 * EPSILON;\r\n        }\r\n        else\r\n        {\r\n            startPos = ray.start;\r\n            endPos = ray.start + ray.dir * tt.x + n0 * EPSILON;\r\n        }\r\n        // endPos -= startPos;\r\n        x = int(floor(startPos.x));\r\n        y = int(floor(startPos.y));\r\n        z = int(floor(startPos.z));\r\n        dx = int(floor(endPos.x));\r\n        dy = int(floor(endPos.y));\r\n        dz = int(floor(endPos.z));\r\n        dx-=x;\r\n        dy-=y;\r\n        dz-=z;\r\n    }\r\n    else\r\n        return 0.0;\r\n        \r\n    int sx, sy, sz, exy, exz, ezy, ax, ay, az, bx, by, bz;\r\n    sx = int(sign(float(dx)));\r\n    sy = int(sign(float(dy)));\r\n    sz = int(sign(float(dz)));\r\n    ax = int(abs(float(dx)));\r\n    ay = int(abs(float(dy)));\r\n    az = int(abs(float(dz)));\r\n    bx = 2*ax;\t   by = 2*ay;\t  bz = 2*az;\r\n    exy = ay-ax;   exz = az-ax;\t  ezy = ay-az;\r\n\r\n    vec3 cellPos;\r\n    for(int n = 0; n < CELL_COUNT.x + CELL_COUNT.y + CELL_COUNT.z; n++)\r\n    {\r\n        if(n >= ax+ay+az+1)\r\n            break;\r\n\r\n        cellPos = SMOKEBB_START + vec3(x,y,z)*cellSize + cellSize/2.0;\r\n        intersectRayCubeNorm(ray.start, ray.dir, cellPos, cellSize/2.0, tt, n0, n1);\r\n        if(tt.x < tt.y)\r\n        {\r\n            cellPos = ray.start + ray.dir * tt.x - n0 * EPSILON;\r\n            // totalDense += smokeDense(cellPos) * (tt.y-tt.x);\r\n            totalDense += smokeDense(cellPos);\r\n        }\r\n        else\r\n        {\r\n            cellPos = ray.start + ray.dir * tt.x + n0 * EPSILON;\r\n            // totalDense += smokeDense(cellPos) * length(cellPos - ray.start);\r\n            totalDense += smokeDense(cellPos);\r\n        }\r\n        \r\n        // Update\r\n        if ( exy < 0 ) {\r\n            if ( exz < 0 ) {\r\n            x += sx;\r\n            exy += by; exz += bz;\r\n            }\r\n            else  {\r\n            z += sz;\r\n            exz -= bx; ezy += by;\r\n            }\r\n        }\r\n        else {\r\n            if ( ezy < 0 ) {\r\n            z += sz;\r\n            exz -= bx; ezy += by;\r\n            }\r\n            else  {\r\n            y += sy;\r\n            exy -= bx; ezy -= bz;\r\n            }\r\n        }\r\n    }\r\n    return totalDense;\r\n}\r\n\r\nvec3 renderScene(Ray ray)\r\n{\r\n    vec2 tt;\r\n    vec3 n0, n1;\r\n    if(intersectRayCubeNorm(ray.start, ray.dir, SCENEBB_POS, SCENEBB_SIZE, tt, n0, n1) > 0.0)\r\n    {\r\n        if(tt.x < tt.y)\r\n        {\r\n            return vec3(checkerboardTexture(ray.start + ray.dir * tt.x - n0 * EPSILON));\r\n        }\r\n        else\r\n        {\r\n            return vec3(checkerboardTexture(ray.start + ray.dir * tt.x + n0 * EPSILON));\r\n        }\r\n    }\r\n    else\r\n    {\r\n        return vec3(0.75);\r\n    }\r\n}\r\n\r\nvec3 renderSkyBox(Ray ray)\r\n{\r\n    return vec3(0.75);\r\n}\r\n\r\nvec3 render(Ray ray)\r\n{\r\n    vec2 sceneDist;\r\n    vec2 smokeDist;\r\n\r\n    if (intersectRayCube(ray.start, ray.dir, SCENEBB_POS, SCENEBB_SIZE, sceneDist) > 0.0)\r\n    {\r\n        vec3 sceneColor = renderScene(ray);\r\n        if(intersectRayCube(ray.start, ray.dir, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP-SMOKEBB_START)/2.0, smokeDist) > 0.0)\r\n        {\r\n            // Hit both\r\n            if(sceneDist.x <= smokeDist.x)\r\n            {\r\n                return sceneColor;\r\n            }\r\n            else\r\n            {\r\n                float totalDense = densityTrace(ray);\r\n                return absorb(sceneColor, totalDense);\r\n            }\r\n        }\r\n        else\r\n        {\r\n            // Hit only scene\r\n            return sceneColor;\r\n        }\r\n    }\r\n    else\r\n    {\r\n        vec3 skyboxColor = renderSkyBox(ray);\r\n        if(intersectRayCube(ray.start, ray.dir, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP-SMOKEBB_START)/2.0, smokeDist) > 0.0)\r\n        {\r\n            // Hit smoke\r\n            float totalDense = densityTrace(ray);\r\n            return absorb(skyboxColor, totalDense);\r\n        }\r\n        else\r\n        {\r\n            // Hit only skybox\r\n            return skyboxColor;\r\n        }\r\n    }\r\n}\r\n\r\nvoid main() {\r\n    Ray ray;\r\n    ray.start = u_cam_pos;\r\n    ray.dir = rayDirection();\r\n    ray.depth = 0.0;\r\n\r\n    gl_FragColor = vec4(render(ray), 1.0);\r\n}"
+	module.exports = "uniform vec3 u_cam_pos;\r\nuniform vec3 u_cam_up;\r\nuniform vec3 u_cam_lookAt;\r\nuniform float u_cam_vfov;\r\nuniform float u_cam_near;\r\nuniform float u_cam_far;\r\n\r\nuniform sampler2D u_texture;\r\nuniform float u_screen_width;\r\nuniform float u_screen_height;\r\n\r\nvarying vec2 f_uv;\r\n\r\n#define EPSILON 0.0001\r\n#define SCENEBB_POS vec3(32.0, -1.0, 32.0)\r\n#define SCENEBB_SIZE vec3(32.0, 1.0, 32.0)\r\n#define SMOKEBB_START vec3(0.0)\r\n#define SMOKEBB_STOP vec3(64.0)\r\n#define CELL_COUNT ivec3(64)\r\n\r\nstruct Ray {\r\n    vec3 start;\r\n    vec3 dir;\r\n    float depth;\r\n};\r\n\r\nfloat checkerboardTexture(vec3 p)\r\n{\r\n    p = floor(mod(p/4.0, 2.0));\r\n    return mod(p.x+p.y+p.z, 2.0);\r\n}\r\n\r\n// Input cell index\r\nfloat smokeDense(ivec3 p)\r\n{\r\n    vec2 tmp = vec2(float(p.x)/float(CELL_COUNT.x)\r\n                    , float(p.z)/float(CELL_COUNT.z * CELL_COUNT.y) + (float(p.y))/float(CELL_COUNT.y));\r\n    return texture2D(u_texture, tmp).r;\r\n}\r\n\r\nvec3 absorb(vec3 originColor, float amount)\r\n{\r\n    float fogAmount = 1.0 - exp(-amount * 0.5);\r\n    vec3 fogColor = vec3(1.0, 0.0, 0.0);\r\n    return mix(originColor, fogColor, fogAmount);\r\n}\r\n\r\nvec3 If(bvec3 cond, vec3 resT, vec3 resF)\r\n{\r\n    vec3 res;\r\n    res.x = cond.x ? resT.x : resF.x;\r\n    res.y = cond.y ? resT.y : resF.y;\r\n    res.z = cond.z ? resT.z : resF.z;    \r\n\r\n    return res;\r\n}\r\n\r\nfloat intersectRayCube(vec3 rp, vec3 rd, vec3 cp, vec3 cth, out vec2 t)\r\n{\t\r\n\trp -= cp;\r\n\t\r\n\tvec3 m = 1.0 / -rd;\r\n\tvec3 o = If(lessThan(rd, vec3(0.0)), -cth, cth);\r\n\t\r\n\tvec3 uf = (rp + o) * m;\r\n\tvec3 ub = (rp - o) * m;\r\n\t\r\n\tt.x = max(uf.x, max(uf.y, uf.z));\r\n\tt.y = min(ub.x, min(ub.y, ub.z));\r\n\t\r\n\t// if(ray start == inside cube) \r\n\tif(t.x < 0.0 && t.y > 0.0) {t.xy = t.yx;  return 1.0;}\r\n\t\r\n\treturn t.y < t.x ? 0.0 : (t.x > 0.0 ? 1.0 : -1.0);\r\n}\r\n\r\nfloat intersectRayCubeNorm(vec3 rp, vec3 rd, vec3 cp, vec3 cth, out vec2 t, out vec3 n0, out vec3 n1)\r\n{\t\r\n\trp -= cp;\r\n\t\r\n\tvec3 m = 1.0 / -rd;\r\n    vec3 os = If(lessThan(rd, vec3(0.0)), vec3(1.0), vec3(-1.0));\r\n    //vec3 os = sign(-rd);\r\n\tvec3 o = -cth * os;\r\n\t\r\n    \r\n\tvec3 uf = (rp + o) * m;\r\n\tvec3 ub = (rp - o) * m;\r\n\t\r\n\t//t.x = max(uf.x, max(uf.y, uf.z));\r\n\t//t.y = min(ub.x, min(ub.y, ub.z));\r\n\t\r\n    if(uf.x > uf.y) {t.x = uf.x; n0 = vec3(os.x, 0.0, 0.0);} else \r\n                    {t.x = uf.y; n0 = vec3(0.0, os.y, 0.0);}\r\n    if(uf.z > t.x ) {t.x = uf.z; n0 = vec3(0.0, 0.0, os.z);}\r\n    \r\n    if(ub.x < ub.y) {t.y = ub.x; n1 = vec3(os.x, 0.0, 0.0);} else \r\n                    {t.y = ub.y; n1 = vec3(0.0, os.y, 0.0);}\r\n    if(ub.z < t.y ) {t.y = ub.z; n1 = vec3(0.0, 0.0, os.z);}\r\n    \r\n    \r\n\t// if(ray start == inside cube) \r\n\tif(t.x < 0.0 && t.y > 0.0) \r\n    {\r\n        t.xy = t.yx;  \r\n        \r\n        vec3 n00 = n0;\r\n        n0 = n1;\r\n        n1 = n00;\r\n        \r\n        return 1.0;\r\n    }\r\n\t\r\n\treturn t.y < t.x ? 0.0 : (t.x > 0.0 ? 1.0 : -1.0);\r\n}\r\n\r\nvec3 rayDirection()\r\n{\r\n    // Creat camera plane\r\n    vec2 uv = f_uv * 2.0 - 1.0;\r\n    vec3 view_n = normalize(u_cam_pos - u_cam_lookAt);\r\n    vec3 view_u = normalize(cross(u_cam_up, view_n));\r\n    vec3 view_v = normalize(cross(view_n, view_u));\r\n\r\n    vec3 plane_top = view_v * u_cam_near * tan(radians(u_cam_vfov)/2.0);\r\n    vec3 plane_right = view_u * (u_screen_width/u_screen_height) * length(plane_top);\r\n    return normalize(-view_n * u_cam_near + plane_right * uv.x + plane_top * uv.y);\r\n}\r\n\r\n// Volxel traversal along 3D line\r\nfloat densityTrace(Ray ray)\r\n{\r\n    float totalDense = 0.0;\r\n    vec3 cellSize = (SMOKEBB_STOP - SMOKEBB_START) / float(CELL_COUNT);\r\n    vec2 tt;\r\n    vec3 n0, n1;\r\n    int x, y, z, dx, dy, dz;\r\n    if(intersectRayCubeNorm(ray.start, ray.dir, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP - SMOKEBB_START)/2.0, tt, n0, n1) > 0.0)\r\n    {\r\n        // Enter cube to reduce surface error\r\n        vec3 startPos, endPos;\r\n        if(tt.x < tt.y)\r\n        {\r\n            startPos = ray.start + ray.dir * tt.x - n0 * EPSILON;\r\n            endPos = ray.start + ray.dir * tt.y + n1 * EPSILON;\r\n        }\r\n        else\r\n        {\r\n            startPos = ray.start;\r\n            endPos = ray.start + ray.dir * tt.x + n0 * EPSILON;\r\n        }\r\n        // endPos -= startPos;\r\n        x = int(floor(startPos.x));\r\n        y = int(floor(startPos.y));\r\n        z = int(floor(startPos.z));\r\n        dx = int(floor(endPos.x));\r\n        dy = int(floor(endPos.y));\r\n        dz = int(floor(endPos.z));\r\n        dx-=x;\r\n        dy-=y;\r\n        dz-=z;\r\n    }\r\n    else\r\n        return 0.0;\r\n        \r\n    int sx, sy, sz, exy, exz, ezy, ax, ay, az, bx, by, bz;\r\n    sx = int(sign(float(dx)));\r\n    sy = int(sign(float(dy)));\r\n    sz = int(sign(float(dz)));\r\n    ax = int(abs(float(dx)));\r\n    ay = int(abs(float(dy)));\r\n    az = int(abs(float(dz)));\r\n    bx = 2*ax;\t   by = 2*ay;\t  bz = 2*az;\r\n    exy = ay-ax;   exz = az-ax;\t  ezy = ay-az;\r\n\r\n    vec3 cellPos;\r\n    for(int n = 0; n < CELL_COUNT.x + CELL_COUNT.y + CELL_COUNT.z; n++)\r\n    {\r\n        if(n >= ax+ay+az+1)\r\n            break;\r\n\r\n        cellPos = vec3(x,y,z)*cellSize + cellSize/2.0;\r\n        intersectRayCubeNorm(ray.start, ray.dir, cellPos, cellSize/2.0, tt, n0, n1);\r\n        if(tt.x < tt.y)\r\n        {\r\n            // cellPos = ray.start + ray.dir * tt.x - n0 * EPSILON;\r\n            // totalDense += smokeDense(cellPos) * (tt.y-tt.x);\r\n            totalDense += smokeDense(ivec3(x,y,z));\r\n        }\r\n        else\r\n        {\r\n            // cellPos = ray.start + ray.dir * tt.x + n0 * EPSILON;\r\n            // totalDense += smokeDense(cellPos) * length(cellPos - ray.start);\r\n            totalDense += smokeDense(ivec3(x,y,z));\r\n        }\r\n        \r\n        // Update\r\n        if ( exy < 0 ) {\r\n            if ( exz < 0 ) {\r\n            x += sx;\r\n            exy += by; exz += bz;\r\n            }\r\n            else  {\r\n            z += sz;\r\n            exz -= bx; ezy += by;\r\n            }\r\n        }\r\n        else {\r\n            if ( ezy < 0 ) {\r\n            z += sz;\r\n            exz -= bx; ezy += by;\r\n            }\r\n            else  {\r\n            y += sy;\r\n            exy -= bx; ezy -= bz;\r\n            }\r\n        }\r\n    }\r\n    return totalDense;\r\n}\r\n\r\nvec3 renderScene(Ray ray)\r\n{\r\n    vec2 tt;\r\n    vec3 n0, n1;\r\n    if(intersectRayCubeNorm(ray.start, ray.dir, SCENEBB_POS, SCENEBB_SIZE, tt, n0, n1) > 0.0)\r\n    {\r\n        if(tt.x < tt.y)\r\n        {\r\n            return vec3(checkerboardTexture(ray.start + ray.dir * tt.x - n0 * EPSILON));\r\n        }\r\n        else\r\n        {\r\n            return vec3(checkerboardTexture(ray.start + ray.dir * tt.x + n0 * EPSILON));\r\n        }\r\n    }\r\n    else\r\n    {\r\n        return vec3(0.75);\r\n    }\r\n}\r\n\r\nvec3 renderSkyBox(Ray ray)\r\n{\r\n    return vec3(0.75);\r\n}\r\n\r\nvec3 render(Ray ray)\r\n{\r\n    vec2 sceneDist;\r\n    vec2 smokeDist;\r\n\r\n    if (intersectRayCube(ray.start, ray.dir, SCENEBB_POS, SCENEBB_SIZE, sceneDist) > 0.0)\r\n    {\r\n        vec3 sceneColor = renderScene(ray);\r\n        if(intersectRayCube(ray.start, ray.dir, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP-SMOKEBB_START)/2.0, smokeDist) > 0.0)\r\n        {\r\n            // Hit both\r\n            if(sceneDist.x <= smokeDist.x)\r\n            {\r\n                return sceneColor;\r\n            }\r\n            else\r\n            {\r\n                float totalDense = densityTrace(ray);\r\n                return absorb(sceneColor, totalDense);\r\n            }\r\n        }\r\n        else\r\n        {\r\n            // Hit only scene\r\n            return sceneColor;\r\n        }\r\n    }\r\n    else\r\n    {\r\n        vec3 skyboxColor = renderSkyBox(ray);\r\n        if(intersectRayCube(ray.start, ray.dir, (SMOKEBB_START + SMOKEBB_STOP)/2.0, (SMOKEBB_STOP-SMOKEBB_START)/2.0, smokeDist) > 0.0)\r\n        {\r\n            // Hit smoke\r\n            float totalDense = densityTrace(ray);\r\n            return absorb(skyboxColor, totalDense);\r\n        }\r\n        else\r\n        {\r\n            // Hit only skybox\r\n            return skyboxColor;\r\n        }\r\n    }\r\n}\r\n\r\nvoid main() {\r\n    Ray ray;\r\n    ray.start = u_cam_pos;\r\n    ray.dir = rayDirection();\r\n    ray.depth = 0.0;\r\n\r\n    gl_FragColor = vec4(render(ray), 1.0);\r\n}"
 
 /***/ }
 /******/ ]);

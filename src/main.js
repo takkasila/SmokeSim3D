@@ -5,6 +5,7 @@ const OrbitControls = require('three-orbit-controls')(THREE)
 
 import DAT from 'dat-gui'
 import Stats from 'stats-js'
+import FluidSolver from './fluid_solver'
 
 window.addEventListener('load', function() {
     var stats = new Stats();
@@ -31,24 +32,21 @@ window.addEventListener('load', function() {
 
     var gui = new DAT.GUI();
 
-    camera.position.set(32, 32, 32);
-    var lookAt = new Float32Array([16, 0, 16])
+    camera.position.set(70, 70, 70);
+    var lookAt = new Float32Array([32, 0, 32])
     camera.lookAt(new THREE.Vector3(lookAt[0],lookAt[1],lookAt[2]));
     
-    controls.target.set(0,0,0);
+    controls.target.set(lookAt[0],lookAt[1],lookAt[2]);
 
-    //Dummy Data
-    var side = 32;
-    var amount = Math.pow(side, 2);
-    var data = new Uint8Array(amount);
-    for(var i =0; i <amount; i++)
-    {
-        data[i] = Math.random()*256;
-    }
-    var dataTex = new THREE.DataTexture(data, side, side, THREE.LuminanceFormat, THREE.UnsignedByteType);
-    dataTex.magFilter = THREE.NearestFilter;
+    var fluid = new FluidSolver(64, 64, 64, 0);
+    fluid.add_flow(0.47, 0.53, 0.0, 0.05, 0.47, 0.53, 0.8, 0, 1, 0)
+    fluid.add_flow(0.47, 0.53, 0.47, 0.53, 0.0, 0.05, 0.8, 0, 0, 1)
+    fluid.update(0.05)
+
+    var dataTex = new THREE.DataTexture(fluid.denseUI8, fluid.width, fluid.height*fluid.tall, THREE.LuminanceFormat, THREE.UnsignedByteType);
+    dataTex.magFilter = THREE.LinearFilter;
     dataTex.needsUpdate = true;
-    //=======================================
+
     var myPlaneMaterial = new THREE.ShaderMaterial({
         uniforms:{
             u_buffer: {
@@ -104,7 +102,6 @@ window.addEventListener('load', function() {
     myPlane.position.set(0, 0, 5);
     scene.add(myPlane);
 
-
     window.addEventListener('resize', function() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
@@ -117,6 +114,12 @@ window.addEventListener('load', function() {
         controls.update();
         stats.begin();
         myPlaneMaterial.uniforms.u_cam_pos.value = camera.position;
+
+        fluid.add_flow(0.47, 0.53, 0.0, 0.05, 0.47, 0.53, 1, 0, 1, 0)
+        fluid.add_flow(0.47, 0.53, 0.47, 0.53, 0.0, 0.05, 0.8, 0, 0, 1)
+        fluid.update(0.05)
+        dataTex.needsUpdate = true;
+
         renderer.render(scene, camera);
         stats.end();
         requestAnimationFrame(tick);
