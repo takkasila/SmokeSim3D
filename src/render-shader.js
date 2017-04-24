@@ -3,8 +3,17 @@ const EffectComposer = require('three-effectcomposer')(THREE)
 
 // change to class
 export default class RenderShader{
-    constructor(renderer, scene, camera, width, height)
+    constructor(renderer, scene, camera, lookAt, width, height, dataTex)
     {
+        this.denseData = new Uint8Array(
+            [ 255, 255, 255, 255
+            , 255, 255, 255, 255
+            , 255, 255, 255, 255
+            , 255, 255, 255, 255])
+        this.texture = new THREE.DataTexture(this.denseData, 4, 4, THREE.LuminanceFormat, THREE.UnsignedByteType)
+        this.texture.magFilter = THREE.NearestFilter;
+        this.texture.needsUpdate = true;
+        
         this.composer = new EffectComposer(renderer);
         this.shaderPass = new EffectComposer.ShaderPass({
             uniforms: {
@@ -26,7 +35,7 @@ export default class RenderShader{
                 },
                 u_cam_lookAt: {
                     type: '3fv',
-                    value: new THREE.Vector3(32,0,32)
+                    value: new THREE.Vector3(lookAt[0],lookAt[1],lookAt[2])
                 },
                 u_cam_vfov: {
                     type: 'f',
@@ -47,6 +56,10 @@ export default class RenderShader{
                 u_screen_height: {
                     type: 'f',
                     value: height
+                },
+                u_texture:{
+                    type: 't',
+                    value: dataTex
                 }
             },
             vertexShader: require('./glsl/pass-vert.glsl'),
@@ -64,6 +77,7 @@ export default class RenderShader{
     setSize(width, height) {
         this.shaderPass.material.uniforms.u_screen_width.value = width;
         this.shaderPass.material.uniforms.u_screen_height.value = height;
+        // console.log(this.texture)
     }
 
     update(camera){

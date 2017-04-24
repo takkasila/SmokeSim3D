@@ -5,17 +5,18 @@ uniform float u_cam_vfov;
 uniform float u_cam_near;
 uniform float u_cam_far;
 
+uniform sampler2D u_texture;
 uniform float u_screen_width;
 uniform float u_screen_height;
 
 varying vec2 f_uv;
 
 #define EPSILON 0.0001
-#define SCENEBB_POS vec3(32.0, -1.0, 32.0)
+#define SCENEBB_POS vec3(16.0, -1.0, 16.0)
 #define SCENEBB_SIZE vec3(32.0, 1.0, 32.0)
 #define SMOKEBB_START vec3(0.0)
-#define SMOKEBB_STOP vec3(64.0, 128.0, 64.0)
-#define CELL_COUNT ivec3(64, 128, 64)
+#define SMOKEBB_STOP vec3(32.0, 1.0, 32.0)
+#define CELL_COUNT ivec3(32, 1, 32)
 
 struct Ray {
     vec3 start;
@@ -26,17 +27,19 @@ struct Ray {
 float checkerboardTexture(vec3 p)
 {
     p = floor(mod(p, 2.0));
-    return mod(p.x+p.y+p.z, 2.0);
+    // return mod(p.x+p.y+p.z, 2.0);
+    return 0.9;
+}
+
+ivec2 AT(ivec3 p)
+{
+    return ivec2(p.x+p.z*CELL_COUNT.x+p.y*CELL_COUNT.x*CELL_COUNT.z, 1);
 }
 
 float smokeDense(vec3 p)
 {
-    if(abs(p.x-32.0) < 2.0 && abs(p.z-32.0) <2.0)
-        return 1.0;
-    else if(p.y >100.0)
-        return 1.0;
-    else
-        return 0.00001;
+    vec2 tmp = vec2(p.x/32.0,p.z/32.0);
+    return texture2D(u_texture, tmp).r;
 }
 
 vec3 absorb(vec3 originColor, float amount)
@@ -185,12 +188,14 @@ float densityTrace(Ray ray)
         if(tt.x < tt.y)
         {
             cellPos = ray.start + ray.dir * tt.x - n0 * EPSILON;
-            totalDense += smokeDense(cellPos) * (tt.y-tt.x);
+            // totalDense += smokeDense(cellPos) * (tt.y-tt.x);
+            totalDense += smokeDense(cellPos);
         }
         else
         {
             cellPos = ray.start + ray.dir * tt.x + n0 * EPSILON;
-            totalDense += smokeDense(cellPos) * length(cellPos - ray.start);
+            // totalDense += smokeDense(cellPos) * length(cellPos - ray.start);
+            totalDense += smokeDense(cellPos);
         }
         
         // Update

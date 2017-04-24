@@ -5,7 +5,6 @@ const OrbitControls = require('three-orbit-controls')(THREE)
 
 import DAT from 'dat-gui'
 import Stats from 'stats-js'
-import RenderShader from './render-shader'
 
 window.addEventListener('load', function() {
     var stats = new Stats();
@@ -32,27 +31,93 @@ window.addEventListener('load', function() {
 
     var gui = new DAT.GUI();
 
-    scene.add(new THREE.AxisHelper(20));
-    scene.add(new THREE.DirectionalLight(0xffffff, 1));
-
-    camera.position.set(128, 128, 128);
-    camera.lookAt(new THREE.Vector3(32,0,32));
+    camera.position.set(32, 32, 32);
+    var lookAt = new Float32Array([16, 0, 16])
+    camera.lookAt(new THREE.Vector3(lookAt[0],lookAt[1],lookAt[2]));
     
     controls.target.set(0,0,0);
-    var renderShader = new RenderShader(renderer, scene, camera, window.innerWidth, window.innerHeight);
+
+    //Dummy Data
+    var side = 32;
+    var amount = Math.pow(side, 2);
+    var data = new Uint8Array(amount);
+    for(var i =0; i <amount; i++)
+    {
+        data[i] = Math.random()*256;
+    }
+    var dataTex = new THREE.DataTexture(data, side, side, THREE.LuminanceFormat, THREE.UnsignedByteType);
+    dataTex.magFilter = THREE.NearestFilter;
+    dataTex.needsUpdate = true;
+    //=======================================
+    var myPlaneMaterial = new THREE.ShaderMaterial({
+        uniforms:{
+            u_buffer: {
+                type: '4fv',
+                value: undefined
+            },
+            u_count: {
+                type: 'i',
+                value: 0
+            },
+            u_cam_pos: {
+                type: '3fv',
+                value: camera.position
+            },
+            u_cam_up: {
+                type: '3fv',
+                value: new THREE.Vector3(0,1,0)
+            },
+            u_cam_lookAt: {
+                type: '3fv',
+                value: new THREE.Vector3(lookAt[0],lookAt[1],lookAt[2])
+            },
+            u_cam_vfov: {
+                type: 'f',
+                value: camera.fov
+            },
+            u_cam_near: {
+                type: 'f',
+                value: camera.near
+            },
+            u_cam_far: {
+                type: 'f',
+                value: camera.far
+            },
+            u_screen_width: {
+                type: 'f',
+                value: window.innerWidth
+            },
+            u_screen_height: {
+                type: 'f',
+                value: window.innerHeight
+            },
+            u_texture:{
+                type: 't',
+                value: dataTex
+            }
+        },
+        vertexShader: require('./glsl/pass-vert.glsl'),
+        fragmentShader: require('./glsl/render-frag.glsl')
+    })
+    var myPlaneGeo = new THREE.PlaneBufferGeometry(2, 2);
+    var myPlane = new THREE.Mesh(myPlaneGeo, myPlaneMaterial);
+    myPlane.position.set(0, 0, 5);
+    scene.add(myPlane);
+
 
     window.addEventListener('resize', function() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderShader.setSize(window.innerWidth, window.innerHeight);
+        myPlaneMaterial.uniforms.u_screen_width.value = window.innerWidth;
+        myPlaneMaterial.uniforms.u_screen_height.value = window.innerHeight;
     });
 
     (function tick() {
         controls.update();
         stats.begin();
-        renderShader.update(camera);
-        renderShader.render();
+        myPlaneMaterial.uniforms.u_cam_pos.value = camera.position;
+        renderer.render(scene, camera);
         stats.end();
         requestAnimationFrame(tick);
     })();
