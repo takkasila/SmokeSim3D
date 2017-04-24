@@ -29,4 +29,15 @@ export default class FluidQuantity
                 for(var k=iz_begin; k <=iz_end; k++)
                     this.data_prev[i+k*(this.width+2)+j*(this.width+2)*(this.height+2)] = value
     }
+
+    reset()
+    {
+        for(var i=0; i<this.width+2; i++)
+            for(var j=0; j<this.tall+2; j++)
+                for(var k=0; k <this.height+2; k++)
+                {
+                    this.data[i+k*(this.width+2)+j*(this.width+2)*(this.height+2)] = 0
+                    this.data_prev[i+k*(this.width+2)+j*(this.width+2)*(this.height+2)] = 0
+                }
+    }
 };

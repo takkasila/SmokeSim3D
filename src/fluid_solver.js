@@ -254,4 +254,13 @@ export default class FluidSolver
         }
     }
 
+    reset()
+    {
+        this.dense.reset()
+        this.speed_x.reset()
+        this.speed_y.reset()
+        this.speed_z.reset()
+        updateDenseUI8()
+    }
+
 };
