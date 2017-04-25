@@ -91,13 +91,14 @@
 	    controls.panSpeed = 2.0;
 	
 	    camera.position.set(cellCount[0] + 3, cellCount[1] + 3, cellCount[2] + 3);
-	    camera.lookAt(new THREE.Vector3(cellCount[0] / 2, 0, cellCount[2] / 2));
+	    camera.lookAt(new THREE.Vector3(cellCount[0] / 2, cellCount[1] / 2, cellCount[2] / 2));
 	
-	    controls.target.set(cellCount[0] / 2, 0, cellCount[2] / 2);
+	    controls.target.set(cellCount[0] / 2, cellCount[1] / 2, cellCount[2] / 2);
 	
 	    var fluid = new _fluid_solver2.default(cellCount[0], cellCount[1], cellCount[2], 0);
-	    fluid.add_flow(0.47, 0.53, 0.0, 0.05, 0.47, 0.53, 0.8, 0, 1, 0);
-	    fluid.add_flow(0.47, 0.53, 0.47, 0.53, 0.0, 0.05, 0.8, 0, 0, 1);
+	    fluid.add_flow(0.43, 0.57, 0.0, 0.05, 0.47, 0.53, 1, 0, 1, 0);
+	    fluid.add_flow(0.47, 0.53, 0.47, 0.53, 0.0, 0.05, 0.8, 0, 0, 0.8);
+	    fluid.add_flow(0.05, 0.95, 0.92, 0.95, 0.05, 0.95, 0.1, 0.0, -0.05, 0.0);
 	    fluid.update(0.05);
 	
 	    var dataTex = new THREE.DataTexture(fluid.denseUI8, fluid.width, fluid.height * fluid.tall, THREE.LuminanceFormat, THREE.UnsignedByteType);
@@ -124,7 +125,7 @@
 	            },
 	            u_cam_lookAt: {
 	                type: '3fv',
-	                value: new THREE.Vector3(cellCount[0] / 2, 0, cellCount[2] / 2)
+	                value: new THREE.Vector3(cellCount[0] / 2, cellCount[1] / 2, cellCount[2] / 2)
 	            },
 	            u_cam_vfov: {
 	                type: 'f',
@@ -222,8 +223,9 @@
 	
 	        if (param.simulating) {
 	            t1 = Date.now();
-	            fluid.add_flow(0.47, 0.53, 0.0, 0.05, 0.47, 0.53, 1, 0, 1, 0);
-	            fluid.add_flow(0.47, 0.53, 0.47, 0.53, 0.0, 0.05, 0.8, 0, 0, 1);
+	            fluid.add_flow(0.43, 0.57, 0.0, 0.05, 0.47, 0.53, 1, 0, 1, 0);
+	            fluid.add_flow(0.47, 0.53, 0.47, 0.53, 0.0, 0.05, 0.8, 0, 0, 0.8);
+	            fluid.add_flow(0.05, 0.95, 0.92, 0.95, 0.05, 0.95, 0.1, 0.0, -0.05, 0.0);
 	            fluid.update(0.05);
 	            dataTex.needsUpdate = true;
 	
