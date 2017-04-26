@@ -26,7 +26,7 @@ varying vec2 f_uv;
 #define MAXCELL ivec3(256)
 #define SKYBOX_RADIUS 10000.0
 
-#define SUN_DIR  normalize(vec3(float(-u_cell_x), float(-u_cell_y*2), float(-u_cell_z)))
+#define SUN_DIR  normalize(vec3(float(-u_cell_x)*3.0/5.0, float(-u_cell_y*2), float(-u_cell_z)*3.0/4.0))
 
 struct Ray {
     vec3 start;

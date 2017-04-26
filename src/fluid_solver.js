@@ -200,7 +200,7 @@ export default class FluidSolver
         }
 		//Corner
         //0     , 0     , 0
-        data[this.AT(0, 0, 0)] = (data[this.AT(1, 0, 0) + data[this.AT(0, 1, 0)]] + data[this.AT(0, 0, 1)]) / 3
+        data[this.AT(0, 0, 0)] = (data[this.AT(1, 0, 0)] + data[this.AT(0, 1, 0)] + data[this.AT(0, 0, 1)]) / 3
         //width , 0     , 0
         data[this.AT(this.width+1, 0, 0)] = (data[this.AT(this.width, 0, 0)] + data[this.AT(this.width+1, 1, 0)] + data[this.AT(this.width+1, 0, 1)]) / 3
         //0     , tall  , 0
@@ -260,7 +260,7 @@ export default class FluidSolver
         this.speed_x.reset()
         this.speed_y.reset()
         this.speed_z.reset()
-        updateDenseUI8()
+        this.updateDenseUI8()
     }
 
 };
