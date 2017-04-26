@@ -69,7 +69,7 @@
 	var THREE = __webpack_require__(10);
 	var OrbitControls = __webpack_require__(11)(THREE);
 	
-	var cellCount = [32, 32, 32];
+	var cellCount = [64, 64, 64];
 	// former window.innerWidth
 	// var recordWidth = 1280;
 	// var recordHeight = 720;
@@ -209,7 +209,7 @@
 	    var isRecording = false;
 	    var gui = new _datGui2.default.GUI();
 	    var param = {
-	        simulating: false,
+	        simulating: true,
 	        reset: function reset() {
 	            console.log("Reset Func");
 	            fluid.reset();

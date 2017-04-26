@@ -8,7 +8,7 @@ import Stats from 'stats-js'
 import FluidSolver from './fluid_solver'
 import CCapture from 'ccapture.js'
 
-var cellCount = [32, 32, 32]
+var cellCount = [64, 64, 64]
 // former window.innerWidth
 // var recordWidth = 1280;
 // var recordHeight = 720;
@@ -149,7 +149,7 @@ window.addEventListener('load', function() {
     var isRecording = false;
     var gui = new DAT.GUI();
     var param = {
-        simulating: false,
+        simulating: true,
         reset: function(){
             console.log("Reset Func");
             fluid.reset(); 
